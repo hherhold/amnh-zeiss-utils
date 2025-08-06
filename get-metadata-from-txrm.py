@@ -25,6 +25,9 @@ parser.add_argument("-v", "--verbose", help="Enable verbose output",
                     action="store_true", default=False)
 parser.add_argument("-f", "--fields", help="Comma-separated list of fields to extract",
                     required=False, default=None)
+parser.add_argument("-a", "--all", help="Extract all available metadata fields",
+                    action="store_true", default=False)
+
 
 args = parser.parse_args()
 
@@ -77,6 +80,10 @@ def main():
 
     if args.verbose:
         print("Metadata read successfully.")
+
+    if args.all:
+        print_all_available_fields(metadata)
+        return
 
     if args.fields:
         fields = [field.strip() for field in args.fields.split(',')]
