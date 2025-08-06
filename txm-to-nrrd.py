@@ -28,7 +28,10 @@ args = parser.parse_args()
 def main():
     # Read the txm file using xrmreader
     scan_volume = xrmreader.read_txm(args.input_txm_file)
-
+    if scan_volume is False:
+        print(f"Error: Could not read input file {args.input_txm_file}. Exiting.")
+        return
+    
     # Change the data type to 16 bit unsigned integers.
     scan_volume = scan_volume.astype('uint16')
 
