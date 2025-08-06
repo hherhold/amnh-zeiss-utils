@@ -12,56 +12,51 @@ required packages.
 
 ### `get-metadata-from-txrm.py`
 
-```
-usage: get-metadata-from-txrm.py [-h] -i INPUT_TXRM_FILE [-o OUTPUT_FILE] [-v] [-f FIELDS]
 
-Extract metadata from a Zeiss txrm file.
+    usage: get-metadata-from-txrm.py [-h] -i INPUT_TXRM_FILE [-o OUTPUT_FILE] [-v] [-f FIELDS]
 
-options:
-  -h, --help            show this help message and exit
-  -i INPUT_TXRM_FILE, --input-txrm-file INPUT_TXRM_FILE
-                        Input Zeiss txrm file
-  -o OUTPUT_FILE, --output-file OUTPUT_FILE
-                        Output file to save metadata
-  -v, --verbose         Enable verbose output
-  -f FIELDS, --fields FIELDS
-                        Comma-separated list of fields to extract
-```
+    Extract metadata from a Zeiss txrm file.
+
+    options:
+        -h, --help            show this help message and exit
+        -i INPUT_TXRM_FILE, --input-txrm-file INPUT_TXRM_FILE
+                                Input Zeiss txrm file
+        -o OUTPUT_FILE, --output-file OUTPUT_FILE
+                                Output file to save metadata
+        -v, --verbose         Enable verbose output
+        -f FIELDS, --fields FIELDS
+                                Comma-separated list of fields to extract
 
 
 ### `txm-to-nrrd.py`
 
-```
-usage: txm-to-nrrd.py [-h] -i INPUT_TXM_FILE -o OUTPUT_NRRD_FILE [-v]
+    usage: txm-to-nrrd.py [-h] -i INPUT_TXM_FILE -o OUTPUT_NRRD_FILE [-v]
 
-Convert reconstructed Zeiss txm to NRRD format.
+    Convert reconstructed Zeiss txm to NRRD format.
 
-options:
-  -h, --help            show this help message and exit
-  -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
-                        Input Zeiss txm file
-  -o OUTPUT_NRRD_FILE, --output-nrrd-file OUTPUT_NRRD_FILE
-                        Output NRRD file to save data
-  -v, --verbose         Enable verbose output
-```
+    options:
+        -h, --help            show this help message and exit
+        -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
+                                Input Zeiss txm file
+        -o OUTPUT_NRRD_FILE, --output-nrrd-file OUTPUT_NRRD_FILE
+                                Output NRRD file to save data
+        -v, --verbose         Enable verbose output
 
 ### `txm-to-tiff.py`
 
-```
-usage: txm-to-tiff.py [-h] -i INPUT_TXM_FILE [-p PREFIX] [-o OUTPUT_DIR] [-v]
+    usage: txm-to-tiff.py [-h] -i INPUT_TXM_FILE [-p PREFIX] [-o OUTPUT_DIR] [-v]
 
-Convert reconstructed Zeiss txm to TIFF format.
+    Convert reconstructed Zeiss txm to TIFF format.
 
-options:
-  -h, --help            show this help message and exit
-  -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
-                        Input Zeiss txm file
-  -p PREFIX, --prefix PREFIX
-                        Filename prefix for output TIFF files
-  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
-                        Output directory for TIFF files
-  -v, --verbose         Enable verbose output
-```
+    options:
+        -h, --help            show this help message and exit
+        -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
+                                Input Zeiss txm file
+        -p PREFIX, --prefix PREFIX
+                                Filename prefix for output TIFF files
+        -o OUTPUT_DIR, --output-dir OUTPUT_DIR
+                                Output directory for TIFF files
+        -v, --verbose         Enable verbose output
 
 
 ## Requirements
