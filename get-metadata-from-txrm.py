@@ -42,8 +42,12 @@ default_fields = [
     'source_isocenter_distance', 'detector_isocenter_distance', 'cone_angle',
     'fan_angle', 'camera_offset', 'source_drift', 'current', 'voltage',
     'power', 'exposure_time', 'binning', 'filter', 
-    'scaling_min', 'scaling_max'
+    'scaling_min', 'scaling_max', 'objective_id', 'objective_mag'
 ]
+
+# Objective ID
+# 3 = 4X
+# 5 = 20X
 
 def get_field_from_metadata(metadata, field_name):
     """
@@ -75,6 +79,8 @@ def main():
         print("Input file:", args.input_txrm_file)
         if args.output_file:
             print("Output file:", args.output_file)
+
+    #metadata_entries = xrmreader.read_all_metadata_entries(args.input_txrm_file)
 
     metadata = xrmreader.read_metadata(args.input_txrm_file)
 
