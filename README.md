@@ -18,7 +18,9 @@ files are included here but may be removed at any time.
 
 ### `txrm-monitor.py`
 
-A PySide6 GUI application that monitors directories for new `.txrm` files and automatically extracts metadata when files are stable.
+A PySide6 GUI application that monitors directories for new `.txrm` files and
+automatically extracts metadata when files are stable. This was implemented
+using Claude Sonnet 4.5 inside VS Code wuth Github copilot.
 
 **Features:**
 - Monitors configured directories recursively (scans subdirectories)
@@ -105,7 +107,9 @@ requires. TIFF file handling also requires `tifffile`.
 
 ## Known issues
 
-The "Objective" field in the txrm file is not yet handled.
+The "Objective" field in the txrm file is parsed using a modified version of the
+xrmreader package. I'd like to incorporate these changes back into xrmreader;
+this is in process.
 
 ## Contact
 
