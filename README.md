@@ -8,7 +8,44 @@ It is assumed that you are familiar with running python scripts from the command
 setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with the
 required packages.
 
+This program uses code from the xrmreader package, which is available through
+PyPi as a pip installable package but a repository appears to be  not generally
+available. Special thanks to Dr. Mareike Thies for the xrmreader source files.
+Modifications were made to `reader.py` to parse the objective fields. These
+files are included here but may be removed at any time. 
+
 ## Programs
+
+### `txrm-monitor.py`
+
+A PySide6 GUI application that monitors directories for new `.txrm` files and automatically extracts metadata when files are stable.
+
+**Features:**
+- Monitors configured directories recursively (scans subdirectories)
+- Scans for new `.txrm` files every 5 minutes
+- Tracks file size changes with 10-minute stability window
+- Automatically extracts metadata using `xrmreader` when files are stable
+- Saves metadata to `.txrm.txt` files alongside source files
+- Daily-rotated logging to `logs/` directory
+- Real-time log viewer in GUI
+- Status bar showing current scanning/processing activity
+- Countdown timer for next scan
+- Manual "Scan Now" button for immediate scanning
+- JSON-based configuration for persistent directory list (`txrm-monitor-config.json`)
+
+**Usage:**
+
+```bash
+python txrm-monitor.py
+```
+
+The application provides a graphical interface where you can:
+1. Add/remove directories to monitor
+2. View the list of monitored files and their status
+3. See real-time log output
+4. Trigger manual scans
+
+The window can be minimized while the application continues to run in the background. Closing the window exits the application.
 
 ### `get-metadata-from-txrm.py`
 
