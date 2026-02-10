@@ -6,7 +6,11 @@ txrm-monitor.py
 A PySide6 GUI application that monitors directories for .txrm files and
 automatically extracts metadata when files are stable.
 
-By Hollister Herhold, AMNH, 2025.
+By Hollister Herhold, AMNH, 2026.
+
+This application was developed using Claude Sonnet 4.5 using the REQUIREMENTS.md file
+as a guide for features and functionality. 
+
 """
 
 import sys
@@ -272,6 +276,7 @@ class FileMonitor(QObject):
             
             state.status = "Error"
             state.error = str(e)
+            state.is_completed = True  # Mark as completed so it's no longer monitored
             state.is_processing = False
             self.logger.error(f"Error processing {filepath}: {e}")
         
@@ -281,6 +286,28 @@ class FileMonitor(QObject):
         """Get list of monitored files and their states"""
         with self.lock:
             return [(fp, state.status, state.error) for fp, state in self.monitored_files.items()]
+    
+    def process_file_now(self, filepath: str):
+        """Force immediate processing of a specific file"""
+        with self.lock:
+            if filepath not in self.monitored_files:
+                return False
+            state = self.monitored_files[filepath]
+            
+            if state.is_processing:
+                return False  # Already processing
+            
+            if state.is_completed:
+                return False  # Already completed
+        
+        self.logger.info(f"Force processing file: {filepath}")
+        state.is_processing = True
+        state.status = "Processing (forced)"
+        self.status_updated.emit()
+        
+        # Process in background thread
+        Thread(target=self._process_file, args=(filepath, state), daemon=True).start()
+        return True
 
 
 class TXRMMonitorApp(QMainWindow):
@@ -400,8 +427,16 @@ class TXRMMonitorApp(QMainWindow):
         layout.addLayout(scan_control_layout)
         
         # File status table
+        file_section_layout = QHBoxLayout()
         status_label = QLabel("Monitored Files:")
-        layout.addWidget(status_label)
+        file_section_layout.addWidget(status_label)
+        file_section_layout.addStretch()
+        
+        process_selected_btn = QPushButton("Process Selected Now")
+        process_selected_btn.clicked.connect(self.process_selected_now)
+        file_section_layout.addWidget(process_selected_btn)
+        
+        layout.addLayout(file_section_layout)
         
         self.file_table = QTableWidget()
         self.file_table.setColumnCount(3)
@@ -409,6 +444,8 @@ class TXRMMonitorApp(QMainWindow):
         self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.file_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.file_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.file_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.file_table.setSelectionMode(QTableWidget.SingleSelection)
         layout.addWidget(self.file_table)
         
         # Log viewer
@@ -503,6 +540,27 @@ class TXRMMonitorApp(QMainWindow):
         self.file_monitor.scan_directories()
         self.next_scan_time = time.time() + (SCAN_INTERVAL / 1000)
         self.update_countdown()
+    
+    def process_selected_now(self):
+        """Process the currently selected file immediately"""
+        selected_rows = self.file_table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(self, "No Selection", "Please select a file to process.")
+            return
+        
+        row = selected_rows[0].row()
+        filepath_item = self.file_table.item(row, 0)
+        if not filepath_item:
+            return
+        
+        filepath = filepath_item.text()
+        success = self.file_monitor.process_file_now(filepath)
+        
+        if not success:
+            QMessageBox.warning(self, "Cannot Process", 
+                              "This file cannot be processed now (already processing or completed).")
+        else:
+            self.logger.info(f"User requested immediate processing of: {filepath}")
     
     def load_config(self):
         """Load configuration from JSON file"""

@@ -13,6 +13,7 @@
 - Failure to extract metadata is also noted by writing a filename.txrm.txt file
   and placing "ERROR PROCESSING METADATA" in the contents of the file, in
   addition to logging the failure.
+- Files that encounter errors during processing should no longer be monitored for changes.
 - The app should log its activity to a log file, including when it starts,
   when it finds new files, when it processes files, and any errors that occur.
 - Log files should go in a "logs" directory in the same location as the application.
@@ -20,6 +21,9 @@
 - The application should have a simple GUI that shows the list of .txrm files
   being monitored, their current status (e.g., "Waiting for changes", 
   "Processing", "Completed"), and any errors that have occurred.
+- Users should be able to select a file from the monitored files list and force
+  immediate processing without waiting for the stability timer. This is useful
+  for debugging and testing.
 - The GUI should also have a running text window that shows the log output in real-time.
 - A status bar at the bottom of the window should display which directories and/or files
   are currently being scanned or processed.
