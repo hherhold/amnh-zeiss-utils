@@ -22,6 +22,8 @@ A PySide6 GUI application that monitors directories for new `.txrm` files and
 automatically extracts metadata when files are stable. This was implemented
 using Claude Sonnet 4.5 inside VS Code wuth Github copilot.
 
+![TXRM Monitor UI](UI%20screenshot.png)
+
 **Features:**
 - Monitors configured directories recursively (scans subdirectories)
 - Scans for new `.txrm` files every 5 minutes
