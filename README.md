@@ -8,6 +8,11 @@ It is assumed that you are familiar with running python scripts from the command
 setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with the
 required packages. (But see Requirements section, below.)
 
+Note that this program does not rely on any Zeiss proprietary libraries and is
+standalone (apart from setting up python dependencies in an environment, see
+below) and you can run it on any machine. This means that changes to Zeiss'
+proprietary file format may break this code.
+
 This program uses code from the xrmreader package, which is available through
 PyPi as a pip installable package *but* a repository appears to be not generally
 available. Special thanks to Dr. Mareike Thies for the xrmreader source files.
@@ -20,7 +25,7 @@ files are included here but may be removed at any time.
 
 A PySide6 GUI application that monitors directories for new `.txrm` files and
 automatically extracts metadata when files are stable. This was implemented
-using Claude Sonnet 4.5 inside VS Code wuth Github copilot.
+using Claude Sonnet 4.5 and 4.6 inside VS Code with Github copilot.
 
 ![TXRM Monitor UI](UI%20screenshot.png)
 
