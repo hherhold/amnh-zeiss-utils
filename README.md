@@ -1,12 +1,12 @@
 # amnh-zeiss-utils
 
-Utilities for handling Zeiss txm and txrm files. These python scripts allow display of
-metadata from unreconstructed ('`txrm`') files, as well as converting reconstructed
-('`txm`') files to TIFF stacks or NRRD files.
+Utilities for handling Zeiss txm and txrm files. These python scripts allow
+extraction of metadata from unreconstructed ('`txrm`') files, as well as
+converting reconstructed ('`txm`') files to TIFF stacks or NRRD files.
 
-It is assumed that you are familiar with running python scripts from the command line and
-setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with the
-required packages. (But see Requirements section, below.)
+It is assumed that you are familiar with running python scripts from the command
+line and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is
+included with the required packages. (But see Requirements section, below.)
 
 Note that this program does not rely on any Zeiss proprietary libraries and is
 standalone (apart from setting up python dependencies in an environment, see
