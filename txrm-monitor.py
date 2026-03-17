@@ -193,6 +193,7 @@ class FileMonitor(QObject):
         if files_to_check:
             self.status_message.emit(f"Checking stability of {len(files_to_check)} files...")
         
+        any_changed = False
         for filepath, state in files_to_check:
             if state.is_processing or state.is_completed:
                 continue
@@ -202,7 +203,7 @@ class FileMonitor(QObject):
             if size_changed:
                 self.logger.info(f"File size changed: {filepath}")
                 state.status = f"Waiting for changes ({state.time_until_stable()}s)"
-                self.status_updated.emit()
+                any_changed = True
                 continue
             
             # Check if stable
@@ -211,14 +212,17 @@ class FileMonitor(QObject):
                 self.status_message.emit(f"Processing: {os.path.basename(filepath)}")
                 state.is_processing = True
                 state.status = "Processing"
-                self.status_updated.emit()
+                any_changed = True
                 
                 # Process in background thread
                 Thread(target=self._process_file, args=(filepath, state), daemon=True).start()
             else:
                 remaining = state.time_until_stable()
                 state.status = f"Waiting for changes ({remaining}s)"
-                self.status_updated.emit()
+                any_changed = True
+        
+        if any_changed:
+            self.status_updated.emit()
     
     def _process_file(self, filepath: str, state: FileMonitorState):
         """Extract metadata from file"""
