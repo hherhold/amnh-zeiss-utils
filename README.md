@@ -6,10 +6,10 @@ metadata from unreconstructed ('`txrm`') files, as well as converting reconstruc
 
 It is assumed that you are familiar with running python scripts from the command line and
 setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with the
-required packages.
+required packages. (But see Requirements section, below.)
 
 This program uses code from the xrmreader package, which is available through
-PyPi as a pip installable package but a repository appears to be  not generally
+PyPi as a pip installable package *but* a repository appears to be not generally
 available. Special thanks to Dr. Mareike Thies for the xrmreader source files.
 Modifications were made to `reader.py` to parse the objective fields. These
 files are included here but may be removed at any time. 
@@ -100,22 +100,23 @@ The window can be minimized while the application continues to run in the backgr
 
 ## Requirements
 
-This repo contains a `amnh-zeiss-utils.yaml` file for creating an environment with the
-required packages (and some extras that were used in development, such as Jupyter notebook
-support). In particular, `xrmreader` is required, along with anything else that it
-requires. TIFF file handling also requires `tifffile`.
+This repo contains a `amnh-zeiss-utils.yaml` file for creating an environment
+with the required packages (and some extras that were used in development, such
+as Jupyter notebook support). To be honest, I've had varying success with these
+setups. If this doesn't work, just keep running the scripts, installing what is
+missing as you go.
 
 ## Known issues
 
 The "Objective" field in the txrm file is parsed using a modified version of the
-xrmreader package. I'd like to incorporate these changes back into xrmreader;
-this is in process.
+xrmreader package, as discussed above.
 
 ## Contact
 
 Hollister Herhold, PhD  
 Research Associate, Division of Invertebrate Zoology  
-Research Scientist, Department of Astrophysics  
+Research Scientist, Department of Astrophysics
+Research Scientist, Department of Vertebrate Paleontology
 American Museum of Natural History  
 hherhold@amnh.org  
 
