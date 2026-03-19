@@ -13,12 +13,6 @@ standalone (apart from setting up python dependencies in an environment, see
 below) and you can run it on any machine. This means that changes to Zeiss'
 proprietary file format may break this code.
 
-This program uses code from the xrmreader package, which is available through
-PyPi as a pip installable package *but* a repository appears to be not generally
-available. Special thanks to Dr. Mareike Thies for the xrmreader source files.
-Modifications were made to `reader.py` to parse the objective fields. These
-files are included here but may be removed at any time. 
-
 ## Programs
 
 ### `txrm-monitor.py`
@@ -33,7 +27,7 @@ using Claude Sonnet 4.5 and 4.6 inside VS Code with Github copilot.
 - Monitors configured directories recursively (scans subdirectories)
 - Scans for new `.txrm` files every 5 minutes
 - Tracks file size changes with 10-minute stability window
-- Automatically extracts metadata using `xrmreader` when files are stable
+- Automatically extracts metadata when files are stable
 - Saves metadata to `.txrm.txt` files alongside source files
 - Daily-rotated logging to `logs/` directory
 - Real-time log viewer in GUI
