@@ -1,17 +1,20 @@
 # amnh-zeiss-utils
 
 Utilities for handling Zeiss txm and txrm files. These python scripts allow
-extraction of metadata from unreconstructed ('`txrm`') files, as well as
-converting reconstructed ('`txm`') files to TIFF stacks or NRRD files.
+extraction of metadata from unreconstructed ('`txrm`') and reconstructed
+('`txm`') files, as well as converting reconstructed ('`txm`') files to TIFF
+stacks or NRRD files. (You can convert unreconstruced files too, not sure why
+you'd want to.) There are also some utilities for OLE files (the format Zeiss
+uses for these files.) 
 
 It is assumed that you are familiar with running python scripts from the command
 line and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is
 included with the required packages. (But see Requirements section, below.)
 
-Note that this program does not rely on any Zeiss proprietary libraries and is
+Note that this repo does not rely on any Zeiss proprietary libraries and is
 standalone (apart from setting up python dependencies in an environment, see
-below) and you can run it on any machine. This means that changes to Zeiss'
-proprietary file format may break this code.
+below) and you can run scripts here on any machine. This means that changes to
+Zeiss' proprietary file format may break this code.
 
 ## Programs
 
@@ -49,8 +52,11 @@ Open with the **Preferences…** button. Settings are saved when you click OK.
 | Log Directory | Path for log files | `logs/` next to script |
 | Output Fields | Which `ImageInfo` OLE fields to write | common set (see below) |
 
-- If neither file type is selected a warning is displayed; the application will not monitor any files until at least one type is enabled.
-- Output Fields shows all known `ImageInfo` fields as checkboxes. Fields available only in `.txrm` files are grouped in a separate section and are greyed out (and unchecked) when `.txrm` scanning is disabled.
+- If neither file type is selected a warning is displayed; the application will
+  not monitor any files until at least one type is enabled.
+- Output Fields shows all known `ImageInfo` fields as checkboxes. Fields
+  available only in `.txrm` files are grouped in a separate section and are
+  greyed out (and unchecked) when `.txrm` scanning is disabled.
 - Changing the log directory takes effect immediately without restarting.
 
 **Usage:**
@@ -65,7 +71,8 @@ The application provides a graphical interface where you can:
 3. See real-time log output
 4. Trigger manual scans or force-process a selected file
 
-The window can be minimized while the application continues to run in the background. Closing the window exits the application.
+The window can be minimized while the application continues to run in the
+background. Closing the window exits the application.
 
 ### `get-metadata-from-txrm.py`
 
@@ -87,9 +94,10 @@ The window can be minimized while the application continues to run in the backgr
 
 ### `dump-ole-directory.py`
 
-Diagnostic tool that prints (or saves) the full OLE directory tree of any `.txrm`,
-`.txm`, or other OLE-structured file. Useful for exploring what streams are available
-inside a file before reading them with `read-ole-item.py` or `get-metadata-from-txrm.py`.
+Diagnostic tool that prints (or saves) the full OLE directory tree of any
+`.txrm`, `.txm`, or other OLE-structured file. Useful for exploring what streams
+are available inside a file before reading them with `read-ole-item.py` or
+`get-metadata-from-txrm.py`.
 
     usage: dump-ole-directory.py [-h] -i INPUT_FILE [-o OUTPUT_FILE]
 
@@ -110,11 +118,12 @@ python dump-ole-directory.py -i "scan.txrm" -o scan_tree.txt
 
 ### `read-ole-item.py`
 
-Diagnostic tool that reads and prints the value(s) stored at a specific OLE stream
-path inside a `.txrm`, `.txm`, or other OLE file. Supports numeric types (int8–int64,
-uint8–uint64, float32, float64) and string types (UTF-8, UTF-16-LE). When an OLE
-stream contains an array of values (e.g. per-image exposure times), all values are
-printed. Use `--raw` to also see the underlying hex bytes.
+Diagnostic tool that reads and prints the value(s) stored at a specific OLE
+stream path inside a `.txrm`, `.txm`, or other OLE file. Supports numeric types
+(int8–int64, uint8–uint64, float32, float64) and string types (UTF-8,
+UTF-16-LE). When an OLE stream contains an array of values (e.g. per-image
+exposure times), all values are printed. Use `--raw` to also see the underlying
+hex bytes.
 
     usage: read-ole-item.py [-h] -i INPUT_FILE -p PATH -t TYPE [--raw]
 
