@@ -148,7 +148,9 @@ python read-ole-item.py -i "scan.txrm" -p "ImageInfo/ExpTimes" -t float32 --raw
 
     usage: txm-to-nrrd.py [-h] -i INPUT_TXM_FILE -o OUTPUT_NRRD_FILE [-v]
 
-    Convert reconstructed Zeiss txm to NRRD format. NOTE that this does not set the voxel size properly - I need to do some investigating on this.
+    Convert reconstructed Zeiss txm to NRRD format. 
+    
+    NOTE that this does not set the voxel size properly - I need to do some investigating on this.
 
     options:
         -h, --help            show this help message and exit
@@ -187,8 +189,8 @@ missing as you go.
 
 Hollister Herhold, PhD  
 Research Associate, Division of Invertebrate Zoology  
-Research Scientist, Department of Astrophysics
-Research Scientist, Department of Vertebrate Paleontology
+Post-doctoral Research Scientist, Department of Vertebrate Paleontology  
+Research Scientist, Department of Astrophysics  
 American Museum of Natural History  
 hherhold@amnh.org  
 
