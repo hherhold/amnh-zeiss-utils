@@ -101,7 +101,7 @@ def main():
 
     nrrd.write(args.output_nrrd_file, scan_volume, compression_level=1, index_order='C')
 
-    print("WARNING - Voxel size has not been set. This may be fixed in future versions.") of this script.")
+    print("WARNING - Voxel size has not been set. This may be fixed in future versions.")
 
 if __name__ == "__main__":
     main()
