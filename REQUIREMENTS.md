@@ -17,6 +17,7 @@
 - The app should log its activity to a log file, including when it starts,
   when it finds new files, when it processes files, and any errors that occur.
 - Log files should go in a "logs" directory in the same location as the application.
+  The log directory is configurable in the Preferences panel.
 - Log files should be rotated daily, with a new log file created each day.
 - The application should have a simple GUI that shows the list of .txrm files
   being monitored, their current status (e.g., "Waiting for changes", 
@@ -26,7 +27,7 @@
   for debugging and testing.
 - The GUI should also have a running text window that shows the log output in real-time.
 - A status bar at the bottom of the window should display which directories and/or files
-  are currently being scanned or processed.
+  are currently being scanned or processed. It is updated when a file finishes processing.
 - The list of directories to monitor should be configurable in the GUI and saved in
   a local preferences file, ideally in JSON format.
 - Errors in extracting metadata should be logged.
@@ -38,4 +39,28 @@
 - There is no maximum number of files that can be monitored. There should be no
   more than several hundred files to watch, so this should not be an issue.
 
+Preferences Panel
+-----------------
+A "Preferences…" button in the main window opens a modal Preferences dialog with
+the following configurable settings, all persisted in the JSON configuration file:
+
+- File Types to Monitor: checkboxes to independently enable scanning for .txrm
+  files, .txm files, or both. At least one type must be selected; if neither is
+  checked the application defaults to .txrm.
+
+- Timing:
+  - Scan interval (minutes): how often directories are scanned for new files
+    (default 5 minutes, range 1–120).
+  - Stability duration (minutes): how long a file must remain unchanged in size
+    before its metadata is extracted (default 10 minutes, range 1–120).
+
+- Log Directory: path where daily-rotated log files are written. Defaults to a
+  "logs" subdirectory next to the script. A "Browse…" button opens a folder
+  picker. Changing this value takes effect immediately without restarting.
+
+- Output Fields: a scrollable checkbox list of all known ImageInfo OLE fields.
+  Checked fields are written to the output .txt file. Fields that are present
+  only in .txrm files are greyed out (and unchecked) when "Scan .txrm files"
+  is not selected. A section separator visually distinguishes common fields
+  from .txrm-only fields.
 

@@ -26,7 +26,9 @@ from typing import Dict, List, Optional
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QTextEdit, QFileDialog,
-    QLabel, QListWidget, QMessageBox, QHeaderView, QStatusBar
+    QLabel, QListWidget, QMessageBox, QHeaderView, QStatusBar,
+    QDialog, QDialogButtonBox, QCheckBox, QSpinBox, QGroupBox,
+    QScrollArea, QLineEdit, QFormLayout,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QTextCursor
@@ -156,6 +158,41 @@ _DEFAULT_OUTPUT_FIELDS = [
     'ImageInfo/TubeState',
 ]
 
+# Fields present only in .txrm files (used to grey them out when txrm is not selected).
+_TXRM_ONLY_FIELDS = {
+    'ImageInfo/AutoGridOn',
+    'ImageInfo/CCFilAdjustStep',
+    'ImageInfo/CCVersion',
+    'ImageInfo/ColdCathodeState',
+    'ImageInfo/Filament',
+    'ImageInfo/FilamentPercent',
+    'ImageInfo/GridOffset',
+    'ImageInfo/GridVoltage',
+    'ImageInfo/IsCCOn',
+    'ImageInfo/RequestedFilament',
+    'ImageInfo/RequestedPower',
+    'ImageInfo/RequestedTargetCurrent',
+    'ImageInfo/SourceDriftInterval',
+    'ImageInfo/SourceDriftTotal',
+    'ImageInfo/SourceSerialNumber',
+    'ImageInfo/SourceType',
+    'ImageInfo/SpotIndex',
+    'ImageInfo/TargetTurn',
+    'ImageInfo/TFMIsOn',
+    'ImageInfo/TubeEfficiency',
+    'ImageInfo/TubeState',
+}
+
+DEFAULT_PREFS = {
+    'directories': [],
+    'scan_txrm': True,
+    'scan_txm': False,
+    'scan_interval_minutes': 5,
+    'stability_minutes': 10,
+    'log_dir': 'logs',
+    'output_fields': list(_DEFAULT_OUTPUT_FIELDS),
+}
+
 
 def _read_ole_value(ole, path, fmt):
     """Read the first scalar value from an OLE stream using struct format fmt.
@@ -224,11 +261,8 @@ def read_metadata(file_name):
 
 
 # Constants
-SCAN_INTERVAL = 5 * 60 * 1000  # 5 minutes in milliseconds
-STABILITY_CHECK_INTERVAL = 10 * 1000  # 10 seconds in milliseconds (for checking stability)
-STABILITY_DURATION = 10 * 60  # 10 minutes in seconds
+STABILITY_CHECK_INTERVAL = 10 * 1000  # 10 seconds in milliseconds (stability polling rate)
 CONFIG_FILE = "txrm-monitor-config.json"
-LOG_DIR = "logs"
 
 
 class FileMonitorState:
@@ -304,14 +338,32 @@ class FileMonitor(QObject):
     status_updated = Signal()
     status_message = Signal(str)
     
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger, file_extensions: set,
+                 output_fields: List[str], stability_seconds: int = 600):
         super().__init__()
         self.logger = logger
         self.monitored_files: Dict[str, FileMonitorState] = {}
         self.directories: List[str] = []
+        self.file_extensions = file_extensions
+        self.output_fields = list(output_fields)
+        self.stability_seconds = stability_seconds
         self.lock = Lock()
         self.running = False
-    
+
+    def set_file_extensions(self, extensions: set):
+        """Update the set of file extensions to monitor."""
+        with self.lock:
+            self.file_extensions = extensions
+
+    def set_output_fields(self, fields: List[str]):
+        """Update the list of fields to write to output files."""
+        with self.lock:
+            self.output_fields = list(fields)
+
+    def set_stability_seconds(self, seconds: int):
+        """Update the stability duration."""
+        self.stability_seconds = seconds
+
     def set_directories(self, directories: List[str]):
         """Update list of directories to monitor"""
         with self.lock:
@@ -341,7 +393,8 @@ class FileMonitor(QObject):
                     self.status_message.emit(f"Scanning: {root}")
                     
                     for filename in files:
-                        if filename.endswith('.txrm'):
+                        ext = os.path.splitext(filename)[1].lower()
+                        if ext in self.file_extensions:
                             txrm_path = os.path.join(root, filename)
                             txt_path = txrm_path + '.txt'
                             
@@ -396,17 +449,18 @@ class FileMonitor(QObject):
                 continue
             
             # Check if stable
-            if state.is_stable():
+            elapsed = time.time() - state.last_size_change
+            if elapsed >= self.stability_seconds:
                 self.logger.info(f"File is stable, processing: {filepath}")
                 self.status_message.emit(f"Processing: {os.path.basename(filepath)}")
                 state.is_processing = True
                 state.status = "Processing"
                 any_changed = True
-                
+
                 # Process in background thread
                 Thread(target=self._process_file, args=(filepath, state), daemon=True).start()
             else:
-                remaining = state.time_until_stable()
+                remaining = max(0, int(self.stability_seconds - elapsed))
                 state.status = f"Waiting for changes ({remaining}s)"
                 any_changed = True
         
@@ -429,7 +483,7 @@ class FileMonitor(QObject):
             output_lines.append(f"Extraction date: {datetime.now()}")
             output_lines.append("")
             
-            for field in _DEFAULT_OUTPUT_FIELDS:
+            for field in self.output_fields:
                 value = metadata.get(field, None)
                 if value is not None:
                     output_lines.append(f"{field}: {value}")
@@ -444,6 +498,7 @@ class FileMonitor(QObject):
             state.is_completed = True
             state.is_processing = False
             self.logger.info(f"Successfully processed: {filepath}")
+            self.status_message.emit(f"Completed: {os.path.basename(filepath)}")
             
         except Exception as e:
             # Write error file
@@ -458,6 +513,7 @@ class FileMonitor(QObject):
             state.is_completed = True  # Mark as completed so it's no longer monitored
             state.is_processing = False
             self.logger.error(f"Error processing {filepath}: {e}")
+            self.status_message.emit(f"Error processing: {os.path.basename(filepath)}: {e}")
         
         self.status_updated.emit()
     
@@ -489,6 +545,135 @@ class FileMonitor(QObject):
         return True
 
 
+class PreferencesDialog(QDialog):
+    """Preferences dialog for configuring monitoring settings."""
+
+    def __init__(self, prefs: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Preferences")
+        self.setMinimumWidth(540)
+        self.setMinimumHeight(640)
+        self._prefs = prefs
+        self._setup_ui()
+
+    def _setup_ui(self):
+        outer = QVBoxLayout(self)
+
+        # ── File Types ──────────────────────────────────────────────────────
+        ft_group = QGroupBox("File Types to Monitor")
+        ft_layout = QVBoxLayout(ft_group)
+        self._txrm_cb = QCheckBox("Scan .txrm files")
+        self._txrm_cb.setChecked(self._prefs.get('scan_txrm', True))
+        self._txm_cb = QCheckBox("Scan .txm files")
+        self._txm_cb.setChecked(self._prefs.get('scan_txm', False))
+        ft_layout.addWidget(self._txrm_cb)
+        ft_layout.addWidget(self._txm_cb)
+        self._no_type_warning = QLabel(
+            "⚠  No file type selected — the application will not monitor any files."
+        )
+        self._no_type_warning.setStyleSheet("color: darkorange; font-style: italic;")
+        self._no_type_warning.setWordWrap(True)
+        ft_layout.addWidget(self._no_type_warning)
+        outer.addWidget(ft_group)
+
+        # ── Timing ──────────────────────────────────────────────────────────
+        timing_group = QGroupBox("Timing")
+        timing_layout = QFormLayout(timing_group)
+        self._scan_spin = QSpinBox()
+        self._scan_spin.setRange(1, 120)
+        self._scan_spin.setSuffix(" min")
+        self._scan_spin.setValue(self._prefs.get('scan_interval_minutes', 5))
+        timing_layout.addRow("Scan interval:", self._scan_spin)
+        self._stab_spin = QSpinBox()
+        self._stab_spin.setRange(1, 120)
+        self._stab_spin.setSuffix(" min")
+        self._stab_spin.setValue(self._prefs.get('stability_minutes', 10))
+        timing_layout.addRow("Stability duration:", self._stab_spin)
+        outer.addWidget(timing_group)
+
+        # ── Log Directory ────────────────────────────────────────────────────
+        log_group = QGroupBox("Log Directory")
+        log_layout = QHBoxLayout(log_group)
+        self._log_dir_edit = QLineEdit(self._prefs.get('log_dir', 'logs'))
+        browse_btn = QPushButton("Browse\u2026")
+        browse_btn.clicked.connect(self._browse_log_dir)
+        log_layout.addWidget(self._log_dir_edit)
+        log_layout.addWidget(browse_btn)
+        outer.addWidget(log_group)
+
+        # ── Output Fields ────────────────────────────────────────────────────
+        fields_group = QGroupBox("Output Fields")
+        fg_layout = QVBoxLayout(fields_group)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        fields_container = QWidget()
+        fc_layout = QVBoxLayout(fields_container)
+        fc_layout.setSpacing(2)
+        enabled_set = set(self._prefs.get('output_fields', list(_DEFAULT_OUTPUT_FIELDS)))
+        self._field_cbs = {}
+        added_txrm_header = False
+        for path in _IMAGEINFO_FIELDS:
+            if path in _TXRM_ONLY_FIELDS and not added_txrm_header:
+                sep = QLabel("\u2500\u2500 .txrm only \u2500\u2500")
+                sep.setStyleSheet("color: gray; font-style: italic; margin-top: 6px;")
+                fc_layout.addWidget(sep)
+                added_txrm_header = True
+            cb = QCheckBox(path)
+            cb.setChecked(path in enabled_set)
+            self._field_cbs[path] = cb
+            fc_layout.addWidget(cb)
+        fc_layout.addStretch()
+        scroll.setWidget(fields_container)
+        fg_layout.addWidget(scroll)
+        outer.addWidget(fields_group, stretch=1)
+
+        # Wire txrm checkbox to enable/disable txrm-only fields.
+        self._txrm_cb.toggled.connect(self._update_txrm_field_state)
+        self._update_txrm_field_state(self._txrm_cb.isChecked())
+        # Wire both checkboxes to show/hide the no-type-selected warning.
+        self._txrm_cb.toggled.connect(self._update_no_type_warning)
+        self._txm_cb.toggled.connect(self._update_no_type_warning)
+        self._update_no_type_warning()
+
+        # ── Buttons ──────────────────────────────────────────────────────────
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+
+    def _browse_log_dir(self):
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select Log Directory", self._log_dir_edit.text()
+        )
+        if directory:
+            self._log_dir_edit.setText(directory)
+
+    def _update_txrm_field_state(self, enabled: bool):
+        for path, cb in self._field_cbs.items():
+            if path in _TXRM_ONLY_FIELDS:
+                cb.setEnabled(enabled)
+                if not enabled:
+                    cb.setChecked(False)
+
+    def _update_no_type_warning(self, _checked: bool = False):
+        neither = not self._txrm_cb.isChecked() and not self._txm_cb.isChecked()
+        self._no_type_warning.setVisible(neither)
+
+    def get_prefs(self) -> dict:
+        """Return updated preferences from the dialog controls."""
+        selected = {path for path, cb in self._field_cbs.items() if cb.isChecked()}
+        # Preserve _IMAGEINFO_FIELDS insertion order.
+        output_fields = [p for p in _IMAGEINFO_FIELDS if p in selected]
+        return {
+            'scan_txrm': self._txrm_cb.isChecked(),
+            'scan_txm': self._txm_cb.isChecked(),
+            'scan_interval_minutes': self._scan_spin.value(),
+            'stability_minutes': self._stab_spin.value(),
+            'log_dir': self._log_dir_edit.text().strip() or 'logs',
+            'output_fields': output_fields,
+        }
+
+
 class TXRMMonitorApp(QMainWindow):
     """Main application window"""
     
@@ -496,68 +681,81 @@ class TXRMMonitorApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("TXRM File Monitor")
         self.setGeometry(100, 100, 1000, 700)
-        
-        # Setup logging
-        self.setup_logging()
-        
-        # Initialize file monitor
-        self.file_monitor = FileMonitor(self.logger)
+
+        # Load config before setting up logging so we know the log directory.
+        self.prefs = dict(DEFAULT_PREFS)
+        self._load_config_early()
+
+        # Setup logging with the configured (or default) log directory.
+        self.setup_logging(self.prefs['log_dir'])
+        self.logger.info(
+            f"Configuration loaded from {CONFIG_FILE}"
+            if os.path.exists(CONFIG_FILE)
+            else "No configuration file found; using defaults"
+        )
+
+        # Initialize file monitor with preferences.
+        self.file_monitor = FileMonitor(
+            self.logger,
+            file_extensions=self._get_file_extensions(),
+            output_fields=self.prefs['output_fields'],
+            stability_seconds=self.prefs['stability_minutes'] * 60,
+        )
+        self.file_monitor.set_directories(self.prefs['directories'])
         self.file_monitor.status_updated.connect(self.update_file_table)
         self.file_monitor.status_message.connect(self.update_status_bar)
-        
-        # Load configuration
-        self.load_config()
-        
+
         # Setup UI
         self.setup_ui()
-        
+
         # Setup timers
-        self.next_scan_time = time.time() + (SCAN_INTERVAL / 1000)
-        
+        scan_interval_ms = self.prefs['scan_interval_minutes'] * 60 * 1000
+        self.next_scan_time = time.time() + (scan_interval_ms / 1000)
+
         self.scan_timer = QTimer()
         self.scan_timer.timeout.connect(self.on_scan_timeout)
-        self.scan_timer.start(SCAN_INTERVAL)
-        
+        self.scan_timer.start(scan_interval_ms)
+
         self.stability_timer = QTimer()
         self.stability_timer.timeout.connect(self.file_monitor.check_stability_and_process)
         self.stability_timer.start(STABILITY_CHECK_INTERVAL)
-        
+
         # Countdown update timer (updates every second)
         self.countdown_timer = QTimer()
         self.countdown_timer.timeout.connect(self.update_countdown)
-        self.countdown_timer.start(1000)  # Update every second
-        
+        self.countdown_timer.start(1000)
+
         # Initial scan
         self.file_monitor.scan_directories()
-        
+
         self.logger.info("TXRM Monitor application started")
     
-    def setup_logging(self):
-        """Setup logging system with daily rotation and GUI display"""
+    def setup_logging(self, log_dir: str = 'logs'):
+        """Setup logging system with daily rotation and GUI display."""
         self.logger = logging.getLogger('TXRMMonitor')
         self.logger.setLevel(logging.INFO)
-        
-        # Create logs directory
-        Path(LOG_DIR).mkdir(exist_ok=True)
-        
-        # Setup rotating file handler
-        file_handler = RotatingFileHandler(LOG_DIR)
+        # Clear any handlers from a previous setup_logging call.
+        self.logger.handlers.clear()
+
+        # Rotating file handler
+        Path(log_dir).mkdir(exist_ok=True, parents=True)
+        file_handler = RotatingFileHandler(log_dir)
         file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(file_formatter)
         self.logger.addHandler(file_handler)
-        
-        # Setup GUI handler
+
+        # GUI handler
         self.log_signaler = LogSignaler()
-        
+
         class GUIHandler(logging.Handler):
             def __init__(self, signaler):
                 super().__init__()
                 self.signaler = signaler
-            
+
             def emit(self, record):
                 msg = self.format(record)
                 self.signaler.log_message.emit(msg)
-        
+
         gui_handler = GUIHandler(self.log_signaler)
         gui_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         gui_handler.setFormatter(gui_formatter)
@@ -576,7 +774,7 @@ class TXRMMonitorApp(QMainWindow):
         
         self.dir_list = QListWidget()
         self.dir_list.setMaximumHeight(100)
-        for directory in self.file_monitor.directories:
+        for directory in self.prefs['directories']:
             self.dir_list.addItem(directory)
         dir_layout.addWidget(self.dir_list)
         
@@ -592,17 +790,21 @@ class TXRMMonitorApp(QMainWindow):
         dir_layout.addLayout(dir_button_layout)
         layout.addLayout(dir_layout)
         
-        # Countdown timer display and scan now button
+        # Countdown timer display, scan now button, and preferences button
         scan_control_layout = QHBoxLayout()
         self.countdown_label = QLabel("Next scan in: --:--")
         self.countdown_label.setStyleSheet("font-weight: bold; padding: 5px;")
         scan_control_layout.addWidget(self.countdown_label)
-        
+
         scan_now_btn = QPushButton("Scan Now")
         scan_now_btn.clicked.connect(self.scan_now)
         scan_control_layout.addWidget(scan_now_btn)
+
+        preferences_btn = QPushButton("Preferences\u2026")
+        preferences_btn.clicked.connect(self.show_preferences)
+        scan_control_layout.addWidget(preferences_btn)
+
         scan_control_layout.addStretch()
-        
         layout.addLayout(scan_control_layout)
         
         # File status table
@@ -648,31 +850,22 @@ class TXRMMonitorApp(QMainWindow):
         """Add a directory to monitor"""
         directory = QFileDialog.getExistingDirectory(self, "Select Directory to Monitor")
         if directory:
-            # Add to list widget
             self.dir_list.addItem(directory)
-            
-            # Update file monitor
             directories = [self.dir_list.item(i).text() for i in range(self.dir_list.count())]
+            self.prefs['directories'] = directories
             self.file_monitor.set_directories(directories)
-            
-            # Save config
             self.save_config()
-            
-            # Trigger immediate scan
             self.file_monitor.scan_directories()
-            self.next_scan_time = time.time() + (SCAN_INTERVAL / 1000)
+            self.next_scan_time = time.time() + self.prefs['scan_interval_minutes'] * 60
     
     def remove_directory(self):
         """Remove selected directory from monitoring"""
         current_item = self.dir_list.currentItem()
         if current_item:
             self.dir_list.takeItem(self.dir_list.row(current_item))
-            
-            # Update file monitor
             directories = [self.dir_list.item(i).text() for i in range(self.dir_list.count())]
+            self.prefs['directories'] = directories
             self.file_monitor.set_directories(directories)
-            
-            # Save config
             self.save_config()
     
     def update_file_table(self):
@@ -701,7 +894,7 @@ class TXRMMonitorApp(QMainWindow):
     def on_scan_timeout(self):
         """Handle scan timer timeout"""
         self.file_monitor.scan_directories()
-        self.next_scan_time = time.time() + (SCAN_INTERVAL / 1000)
+        self.next_scan_time = time.time() + self.prefs['scan_interval_minutes'] * 60
     
     def update_countdown(self):
         """Update the countdown display"""
@@ -717,7 +910,7 @@ class TXRMMonitorApp(QMainWindow):
         """Trigger an immediate scan"""
         self.logger.info("Manual scan triggered")
         self.file_monitor.scan_directories()
-        self.next_scan_time = time.time() + (SCAN_INTERVAL / 1000)
+        self.next_scan_time = time.time() + self.prefs['scan_interval_minutes'] * 60
         self.update_countdown()
     
     def process_selected_now(self):
@@ -741,25 +934,69 @@ class TXRMMonitorApp(QMainWindow):
         else:
             self.logger.info(f"User requested immediate processing of: {filepath}")
     
-    def load_config(self):
-        """Load configuration from JSON file"""
+    def _load_config_early(self):
+        """Load configuration before logging is set up; silently uses defaults on error."""
         try:
             if os.path.exists(CONFIG_FILE):
                 with open(CONFIG_FILE, 'r') as f:
                     config = json.load(f)
-                    directories = config.get('directories', [])
-                    self.file_monitor.set_directories(directories)
-                    self.logger.info(f"Configuration loaded from {CONFIG_FILE}")
-        except Exception as e:
-            self.logger.error(f"Error loading configuration: {e}")
+                for key in DEFAULT_PREFS:
+                    if key in config:
+                        self.prefs[key] = config[key]
+        except Exception:
+            pass  # Use defaults silently.
+
+    def show_preferences(self):
+        """Open the Preferences dialog."""
+        dialog = PreferencesDialog(self.prefs, self)
+        if dialog.exec() == QDialog.Accepted:
+            new_prefs = dialog.get_prefs()
+            # Directories are managed via the main window buttons, not the dialog.
+            new_prefs['directories'] = self.prefs['directories']
+            self.prefs.update(new_prefs)
+            self._apply_preferences()
+            self.save_config()
+
+    def _get_file_extensions(self) -> set:
+        """Return the set of file extensions to monitor based on preferences."""
+        extensions = set()
+        if self.prefs.get('scan_txrm', True):
+            extensions.add('.txrm')
+        if self.prefs.get('scan_txm', False):
+            extensions.add('.txm')
+        return extensions or {'.txrm'}  # Default to .txrm if nothing is checked.
+
+    def _apply_preferences(self):
+        """Apply updated preferences to the running application."""
+        self.file_monitor.set_file_extensions(self._get_file_extensions())
+        self.file_monitor.set_output_fields(self.prefs['output_fields'])
+        self.file_monitor.set_stability_seconds(self.prefs['stability_minutes'] * 60)
+
+        scan_interval_ms = self.prefs['scan_interval_minutes'] * 60 * 1000
+        self.scan_timer.stop()
+        self.scan_timer.start(scan_interval_ms)
+        self.next_scan_time = time.time() + (scan_interval_ms / 1000)
+
+        self._update_log_handler(self.prefs['log_dir'])
+        self.logger.info("Preferences updated")
+
+    def _update_log_handler(self, new_log_dir: str):
+        """Swap the rotating file handler to write to a new log directory."""
+        for handler in list(self.logger.handlers):
+            if isinstance(handler, RotatingFileHandler):
+                handler.file_handler.close()
+                self.logger.removeHandler(handler)
+        Path(new_log_dir).mkdir(exist_ok=True, parents=True)
+        file_handler = RotatingFileHandler(new_log_dir)
+        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+        self.logger.addHandler(file_handler)
     
     def save_config(self):
-        """Save configuration to JSON file"""
+        """Save current preferences to JSON file."""
         try:
-            directories = [self.dir_list.item(i).text() for i in range(self.dir_list.count())]
-            config = {'directories': directories}
             with open(CONFIG_FILE, 'w') as f:
-                json.dump(config, f, indent=2)
+                json.dump(self.prefs, f, indent=2)
             self.logger.info(f"Configuration saved to {CONFIG_FILE}")
         except Exception as e:
             self.logger.error(f"Error saving configuration: {e}")
