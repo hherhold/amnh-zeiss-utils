@@ -479,6 +479,7 @@ class FileMonitor(QObject):
 
             # Format metadata output (similar to get-metadata-from-txrm.py)
             output_lines = []
+            output_lines.append("txrm-monitor v1.0")
             output_lines.append(f"Metadata extracted from: {filepath}")
             output_lines.append(f"Extraction date: {datetime.now()}")
             output_lines.append("")
