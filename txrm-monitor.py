@@ -546,23 +546,28 @@ class FileMonitor(QObject):
         return True
 
     def process_dropped_file(self, filepath: str):
-        """Process a drag-and-dropped file immediately, bypassing stability checks."""
+        """Process a drag-and-dropped file immediately, bypassing stability checks.
+
+        If the file is currently being monitored for stability it is removed from the
+        monitored list — it no longer needs to be watched since it will be processed now.
+        """
         with self.lock:
-            if filepath in self.monitored_files:
-                state = self.monitored_files[filepath]
-                if state.is_processing:
+            existing = self.monitored_files.get(filepath)
+            if existing is not None:
+                if existing.is_processing:
                     self.logger.info(f"Dropped file already being processed: {filepath}")
                     return False
-                if state.is_completed:
+                if existing.is_completed:
                     self.logger.info(f"Dropped file already processed: {filepath}")
                     return False
-                state.is_processing = True
-                state.status = "Processing (drag & drop)"
-            else:
-                state = FileMonitorState(filepath)
-                state.is_processing = True
-                state.status = "Processing (drag & drop)"
-                self.monitored_files[filepath] = state
+                # Remove from monitoring — it will be processed immediately.
+                del self.monitored_files[filepath]
+                self.logger.info(f"Removed from monitoring (will process via drop): {filepath}")
+
+            state = FileMonitorState(filepath)
+            state.is_processing = True
+            state.status = "Processing (drag & drop)"
+            # Do not add back to monitored_files; processing is immediate.
 
         self.logger.info(f"Processing dropped file: {filepath}")
         self.status_message.emit(f"Processing dropped file: {os.path.basename(filepath)}")
