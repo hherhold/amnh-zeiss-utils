@@ -395,7 +395,7 @@ class FileMonitor(QObject):
                     for filename in files:
                         ext = os.path.splitext(filename)[1].lower()
                         if ext in self.file_extensions:
-                            txrm_path = os.path.join(root, filename)
+                            txrm_path = os.path.normpath(os.path.join(root, filename))
                             txt_path = txrm_path + '.txt'
                             
                             # Skip if already has metadata file
