@@ -567,7 +567,9 @@ class FileMonitor(QObject):
             state = FileMonitorState(filepath)
             state.is_processing = True
             state.status = "Processing (drag & drop)"
-            # Do not add back to monitored_files; processing is immediate.
+            # Re-insert under the same key so update_file_table can display
+            # the processing / completed status while _process_file runs.
+            self.monitored_files[filepath] = state
 
         self.logger.info(f"Processing dropped file: {filepath}")
         self.status_message.emit(f"Processing dropped file: {os.path.basename(filepath)}")
