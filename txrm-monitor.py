@@ -977,7 +977,7 @@ class TXRMMonitorApp(QMainWindow):
             for url in event.mimeData().urls():
                 if not url.isLocalFile():
                     continue
-                filepath = url.toLocalFile()
+                filepath = os.path.normpath(url.toLocalFile())
                 ext = os.path.splitext(filepath)[1].lower()
                 if ext not in extensions:
                     continue
