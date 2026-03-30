@@ -25,6 +25,11 @@
 - Users should be able to select a file from the monitored files list and force
   immediate processing without waiting for the stability timer. This is useful
   for debugging and testing.
+- Users should be able to drag and drop .txrm and/or .txm files directly onto the
+  application window to process them immediately. Dropped files are assumed to be
+  complete and ready; they bypass the file-stability timer entirely. The same
+  output fields selected in Preferences are used for drag-and-dropped files. Only
+  file types that match the currently enabled types in Preferences are accepted.
 - The GUI should also have a running text window that shows the log output in real-time.
 - A status bar at the bottom of the window should display which directories and/or files
   are currently being scanned or processed. It is updated when a file finishes processing.

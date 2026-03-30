@@ -36,6 +36,7 @@ using Claude Sonnet 4.5 and 4.6 inside VS Code with Github Copilot.
 - Countdown timer for next scan
 - Manual "Scan Now" button for immediate scanning
 - "Process Selected Now" button to force immediate metadata extraction for a selected file
+- Drag-and-drop support: drop `.txrm` / `.txm` files onto the window for immediate processing (no stability wait)
 - Preferences panel for all configurable settings (see below)
 - All settings persisted in `txrm-monitor-config.json`
 
@@ -70,6 +71,7 @@ The application provides a graphical interface where you can:
 2. View the list of monitored files and their status
 3. See real-time log output
 4. Trigger manual scans or force-process a selected file
+5. Drag and drop `.txrm` / `.txm` files onto the window to process them immediately
 
 The window can be minimized while the application continues to run in the
 background. Closing the window exits the application.

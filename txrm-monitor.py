@@ -545,6 +545,32 @@ class FileMonitor(QObject):
         Thread(target=self._process_file, args=(filepath, state), daemon=True).start()
         return True
 
+    def process_dropped_file(self, filepath: str):
+        """Process a drag-and-dropped file immediately, bypassing stability checks."""
+        with self.lock:
+            if filepath in self.monitored_files:
+                state = self.monitored_files[filepath]
+                if state.is_processing:
+                    self.logger.info(f"Dropped file already being processed: {filepath}")
+                    return False
+                if state.is_completed:
+                    self.logger.info(f"Dropped file already processed: {filepath}")
+                    return False
+                state.is_processing = True
+                state.status = "Processing (drag & drop)"
+            else:
+                state = FileMonitorState(filepath)
+                state.is_processing = True
+                state.status = "Processing (drag & drop)"
+                self.monitored_files[filepath] = state
+
+        self.logger.info(f"Processing dropped file: {filepath}")
+        self.status_message.emit(f"Processing dropped file: {os.path.basename(filepath)}")
+        self.status_updated.emit()
+
+        Thread(target=self._process_file, args=(filepath, state), daemon=True).start()
+        return True
+
 
 class PreferencesDialog(QDialog):
     """Preferences dialog for configuring monitoring settings."""
@@ -764,6 +790,8 @@ class TXRMMonitorApp(QMainWindow):
     
     def setup_ui(self):
         """Create the user interface"""
+        self.setAcceptDrops(True)
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
@@ -808,6 +836,14 @@ class TXRMMonitorApp(QMainWindow):
         scan_control_layout.addStretch()
         layout.addLayout(scan_control_layout)
         
+        # Drag-and-drop hint
+        dnd_label = QLabel(
+            "Drag and drop .txrm / .txm files onto this window to process them immediately."
+        )
+        dnd_label.setStyleSheet("color: gray; font-style: italic; padding: 2px;")
+        dnd_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(dnd_label)
+
         # File status table
         file_section_layout = QHBoxLayout()
         status_label = QLabel("Monitored Files:")
@@ -914,6 +950,40 @@ class TXRMMonitorApp(QMainWindow):
         self.next_scan_time = time.time() + self.prefs['scan_interval_minutes'] * 60
         self.update_countdown()
     
+    def dragEnterEvent(self, event):
+        """Accept drag events containing local .txrm / .txm files."""
+        if event.mimeData().hasUrls():
+            extensions = self._get_file_extensions()
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    ext = os.path.splitext(url.toLocalFile())[1].lower()
+                    if ext in extensions:
+                        event.acceptProposedAction()
+                        return
+        event.ignore()
+
+    def dropEvent(self, event):
+        """Handle dropped .txrm / .txm files and process them immediately."""
+        if event.mimeData().hasUrls():
+            extensions = self._get_file_extensions()
+            processed_any = False
+            for url in event.mimeData().urls():
+                if not url.isLocalFile():
+                    continue
+                filepath = url.toLocalFile()
+                ext = os.path.splitext(filepath)[1].lower()
+                if ext not in extensions:
+                    continue
+                if not os.path.isfile(filepath):
+                    self.logger.warning(f"Dropped path is not a file: {filepath}")
+                    continue
+                self.file_monitor.process_dropped_file(filepath)
+                processed_any = True
+            if processed_any:
+                event.acceptProposedAction()
+            else:
+                event.ignore()
+
     def process_selected_now(self):
         """Process the currently selected file immediately"""
         selected_rows = self.file_table.selectionModel().selectedRows()
