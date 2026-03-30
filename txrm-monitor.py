@@ -430,16 +430,16 @@ class FileMonitor(QObject):
     def check_stability_and_process(self):
         """Check file stability and process stable files"""
         with self.lock:
-            files_to_check = list(self.monitored_files.items())
+            files_to_check = [
+                (fp, s) for fp, s in self.monitored_files.items()
+                if not s.is_processing and not s.is_completed
+            ]
         
         if files_to_check:
             self.status_message.emit(f"Checking stability of {len(files_to_check)} files...")
         
         any_changed = False
         for filepath, state in files_to_check:
-            if state.is_processing or state.is_completed:
-                continue
-            
             # Update file size
             size_changed = state.update_size()
             if size_changed:
