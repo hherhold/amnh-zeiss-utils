@@ -845,7 +845,7 @@ class TXRMMonitorApp(QMainWindow):
         
         # Drag-and-drop hint
         dnd_label = QLabel(
-            "Drag and drop .txrm / .txm files onto this window to process them immediately."
+            "Drag and drop .txrm / .txm files or folders onto this window to process them immediately."
         )
         dnd_label.setStyleSheet("color: gray; font-style: italic; padding: 2px;")
         dnd_label.setAlignment(Qt.AlignCenter)
@@ -958,34 +958,48 @@ class TXRMMonitorApp(QMainWindow):
         self.update_countdown()
     
     def dragEnterEvent(self, event):
-        """Accept drag events containing local .txrm / .txm files."""
+        """Accept drag events containing local .txrm / .txm files or folders."""
         if event.mimeData().hasUrls():
             extensions = self._get_file_extensions()
             for url in event.mimeData().urls():
                 if url.isLocalFile():
-                    ext = os.path.splitext(url.toLocalFile())[1].lower()
+                    local_path = url.toLocalFile()
+                    if os.path.isdir(local_path):
+                        event.acceptProposedAction()
+                        return
+                    ext = os.path.splitext(local_path)[1].lower()
                     if ext in extensions:
                         event.acceptProposedAction()
                         return
         event.ignore()
 
     def dropEvent(self, event):
-        """Handle dropped .txrm / .txm files and process them immediately."""
+        """Handle dropped .txrm / .txm files or folders and process them immediately."""
         if event.mimeData().hasUrls():
             extensions = self._get_file_extensions()
             processed_any = False
             for url in event.mimeData().urls():
                 if not url.isLocalFile():
                     continue
-                filepath = os.path.normpath(url.toLocalFile())
-                ext = os.path.splitext(filepath)[1].lower()
-                if ext not in extensions:
-                    continue
-                if not os.path.isfile(filepath):
-                    self.logger.warning(f"Dropped path is not a file: {filepath}")
-                    continue
-                self.file_monitor.process_dropped_file(filepath)
-                processed_any = True
+                dropped_path = os.path.normpath(url.toLocalFile())
+                if os.path.isdir(dropped_path):
+                    self.logger.info(f"Dropped folder, scanning recursively: {dropped_path}")
+                    for root, _dirs, files in os.walk(dropped_path):
+                        for filename in files:
+                            ext = os.path.splitext(filename)[1].lower()
+                            if ext not in extensions:
+                                continue
+                            filepath = os.path.normpath(os.path.join(root, filename))
+                            self.file_monitor.process_dropped_file(filepath)
+                            processed_any = True
+                elif os.path.isfile(dropped_path):
+                    ext = os.path.splitext(dropped_path)[1].lower()
+                    if ext not in extensions:
+                        continue
+                    self.file_monitor.process_dropped_file(dropped_path)
+                    processed_any = True
+                else:
+                    self.logger.warning(f"Dropped path is not a file or folder: {dropped_path}")
             if processed_any:
                 event.acceptProposedAction()
             else:
