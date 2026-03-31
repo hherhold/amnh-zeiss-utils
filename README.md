@@ -1,11 +1,11 @@
 # amnh-zeiss-utils
 
-Utilities for handling Zeiss txm and txrm files. These python scripts allow
-extraction of metadata from unreconstructed ('`txrm`') and reconstructed
-('`txm`') files, as well as converting reconstructed ('`txm`') files to TIFF
-stacks or NRRD files. (You can convert unreconstruced files too, not sure why
-you'd want to.) There are also some utilities for OLE files (the format Zeiss
-uses for these files.) 
+Utilities for handling Zeiss txm and txrm files, specifically micro-CT files.
+These python scripts allow extraction of metadata from unreconstructed
+('`txrm`') and reconstructed ('`txm`') files, as well as converting
+reconstructed ('`txm`') files to TIFF stacks or NRRD files. (You can convert
+unreconstruced files too, not sure why you'd want to.) There are also some
+utilities for OLE files (the format Zeiss uses for these files.) 
 
 It is assumed that you are familiar with running python scripts from the command
 line and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is
