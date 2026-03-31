@@ -30,6 +30,10 @@
   complete and ready; they bypass the file-stability timer entirely. The same
   output fields selected in Preferences are used for drag-and-dropped files. Only
   file types that match the currently enabled types in Preferences are accepted.
+- Users should be able to drag and drop a folder onto the application window.
+  The application will recursively search the dropped folder for files matching
+  the currently enabled file types and process each one immediately, exactly as
+  if each file had been dropped individually.
 - The GUI should also have a running text window that shows the log output in real-time.
 - A status bar at the bottom of the window should display which directories and/or files
   are currently being scanned or processed. It is updated when a file finishes processing.
