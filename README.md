@@ -1,5 +1,9 @@
 # amnh-zeiss-utils
 
+Warning: This repo is somewhat mis-named as there are utilities for other tasks such as
+handling slicer segmentation files, etc. It's a bit of a dumping ground for scripts used
+to facilitate CT analysis. With that out of the way...
+
 Utilities for handling Zeiss txm and txrm files, specifically micro-CT files.
 These python scripts allow extraction of metadata from unreconstructed
 ('`txrm`') and reconstructed ('`txm`') files, as well as converting
@@ -78,20 +82,21 @@ background. Closing the window exits the application.
 
 ### `get-metadata-from-txrm.py`
 
+```text
+usage: get-metadata-from-txrm.py [-h] -i INPUT_TXRM_FILE [-o OUTPUT_FILE] [-v] [-f FIELDS]
 
-    usage: get-metadata-from-txrm.py [-h] -i INPUT_TXRM_FILE [-o OUTPUT_FILE] [-v] [-f FIELDS]
+Extract metadata from a Zeiss txrm file.
 
-    Extract metadata from a Zeiss txrm file.
-
-    options:
-        -h, --help            show this help message and exit
-        -i INPUT_TXRM_FILE, --input-txrm-file INPUT_TXRM_FILE
-                                Input Zeiss txrm file
-        -o OUTPUT_FILE, --output-file OUTPUT_FILE
-                                Output file to save metadata
-        -v, --verbose         Enable verbose output
-        -f FIELDS, --fields FIELDS
-                                Comma-separated list of fields to extract
+options:
+    -h, --help            show this help message and exit
+    -i INPUT_TXRM_FILE, --input-txrm-file INPUT_TXRM_FILE
+                            Input Zeiss txrm file
+    -o OUTPUT_FILE, --output-file OUTPUT_FILE
+                            Output file to save metadata
+    -v, --verbose         Enable verbose output
+    -f FIELDS, --fields FIELDS
+                            Comma-separated list of fields to extract
+```
 
 
 ### `dump-ole-directory.py`
@@ -101,16 +106,18 @@ Diagnostic tool that prints (or saves) the full OLE directory tree of any
 are available inside a file before reading them with `read-ole-item.py` or
 `get-metadata-from-txrm.py`.
 
-    usage: dump-ole-directory.py [-h] -i INPUT_FILE [-o OUTPUT_FILE]
+```text
+usage: dump-ole-directory.py [-h] -i INPUT_FILE [-o OUTPUT_FILE]
 
-    Dump the OLE directory structure of a file.
+Dump the OLE directory structure of a file.
 
-    options:
-        -h, --help            show this help message and exit
-        -i INPUT_FILE, --input-file INPUT_FILE
-                                Input OLE file (e.g. .txrm, .txm, .ole)
-        -o OUTPUT_FILE, --output-file OUTPUT_FILE
-                                Output text file (default: stdout)
+options:
+    -h, --help            show this help message and exit
+    -i INPUT_FILE, --input-file INPUT_FILE
+                            Input OLE file (e.g. .txrm, .txm, .ole)
+    -o OUTPUT_FILE, --output-file OUTPUT_FILE
+                            Output text file (default: stdout)
+```
 
 **Example:**
 
@@ -127,19 +134,21 @@ UTF-16-LE). When an OLE stream contains an array of values (e.g. per-image
 exposure times), all values are printed. Use `--raw` to also see the underlying
 hex bytes.
 
-    usage: read-ole-item.py [-h] -i INPUT_FILE -p PATH -t TYPE [--raw]
+```text
+usage: read-ole-item.py [-h] -i INPUT_FILE -p PATH -t TYPE [--raw]
 
-    Read and print the value(s) at an OLE directory path in an OLE file.
+Read and print the value(s) at an OLE directory path in an OLE file.
 
-    options:
-        -h, --help            show this help message and exit
-        -i INPUT_FILE, --input-file INPUT_FILE
-                                Input OLE file (e.g. .txrm, .txm, .ole)
-        -p PATH, --path PATH  OLE directory path, slash-separated
-                                (e.g. 'ImageInfo/ImageWidth')
-        -t TYPE, --type TYPE  Data type: int8, uint8, int16, uint16, int32, uint32,
-                                int64, uint64, float32, float64, str, utf8, utf16
-        --raw                 Also print the raw bytes as hex
+options:
+    -h, --help            show this help message and exit
+    -i INPUT_FILE, --input-file INPUT_FILE
+                            Input OLE file (e.g. .txrm, .txm, .ole)
+    -p PATH, --path PATH  OLE directory path, slash-separated
+                            (e.g. 'ImageInfo/ImageWidth')
+    -t TYPE, --type TYPE  Data type: int8, uint8, int16, uint16, int32, uint32,
+                            int64, uint64, float32, float64, str, utf8, utf16
+    --raw                 Also print the raw bytes as hex
+```
 
 **Examples:**
 
@@ -157,35 +166,124 @@ python read-ole-item.py -i "scan.txrm" -p "ImageInfo/ExpTimes" -t float32 --raw
 
 ### `txm-to-nrrd.py`
 
-    usage: txm-to-nrrd.py [-h] -i INPUT_TXM_FILE -o OUTPUT_NRRD_FILE [-v]
+```text
+usage: txm-to-nrrd.py [-h] -i INPUT_TXM_FILE -o OUTPUT_NRRD_FILE [-v]
 
-    Convert reconstructed Zeiss txm to NRRD format. 
-    
-    NOTE that this does not set the voxel size properly - I need to do some investigating on this.
+Convert reconstructed Zeiss txm to NRRD format.
 
-    options:
-        -h, --help            show this help message and exit
-        -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
-                                Input Zeiss txm file
-        -o OUTPUT_NRRD_FILE, --output-nrrd-file OUTPUT_NRRD_FILE
-                                Output NRRD file to save data
-        -v, --verbose         Enable verbose output
+NOTE that this does not set the voxel size properly - I need to do some investigating on this.
+
+options:
+    -h, --help            show this help message and exit
+    -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
+                            Input Zeiss txm file
+    -o OUTPUT_NRRD_FILE, --output-nrrd-file OUTPUT_NRRD_FILE
+                            Output NRRD file to save data
+    -v, --verbose         Enable verbose output
+```
 
 ### `txm-to-tiff.py`
 
-    usage: txm-to-tiff.py [-h] -i INPUT_TXM_FILE [-p PREFIX] [-o OUTPUT_DIR] [-v]
+```text
+usage: txm-to-tiff.py [-h] -i INPUT_TXM_FILE [-p PREFIX] [-o OUTPUT_DIR] [-v]
 
-    Convert reconstructed Zeiss txm to TIFF format.
+Convert reconstructed Zeiss txm to TIFF format.
 
-    options:
-        -h, --help            show this help message and exit
-        -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
-                                Input Zeiss txm file
-        -p PREFIX, --prefix PREFIX
-                                Filename prefix for output TIFF files
-        -o OUTPUT_DIR, --output-dir OUTPUT_DIR
-                                Output directory for TIFF files
-        -v, --verbose         Enable verbose output
+options:
+    -h, --help            show this help message and exit
+    -i INPUT_TXM_FILE, --input-txm-file INPUT_TXM_FILE
+                            Input Zeiss txm file
+    -p PREFIX, --prefix PREFIX
+                            Filename prefix for output TIFF files
+    -o OUTPUT_DIR, --output-dir OUTPUT_DIR
+                            Output directory for TIFF files
+    -v, --verbose         Enable verbose output
+```
+
+### `subsample_segment.py`
+
+Creates a subsampled segmentation NRRD for [biomedisa](https://biomedisa.info/) Smart Interpolation.
+Reads a 3D Slicer `.seg.nrrd` segmentation, merges all segments into a single label volume, then
+retains only every Nth slice along the specified axes (zeroing all other voxels). The output can be
+passed directly to `biomedisa.interpolation` with `--allaxis`.
+
+```text
+usage: subsample_segment.py [-h] [--step [AXIS,STEP ...]] [-o OUTPUT]
+                            CT_VOLUME.nrrd SEGMENTATION.seg.nrrd
+
+positional arguments:
+    CT_VOLUME.nrrd        Path to the CT scan NRRD file (passed unchanged to biomedisa)
+    SEGMENTATION.seg.nrrd Path to the 3D Slicer segmentation file
+
+options:
+    -h, --help            show this help message and exit
+    --step [AXIS,STEP ...]
+                          Keep one slice every STEP slices along AXIS. Provide one or
+                          more AXIS,STEP pairs (no spaces around comma). Valid axes: 0,
+                          1, 2. STEP must be >= 2. Omit entirely to sample all 3 axes
+                          at step 15.
+    -o OUTPUT, --output OUTPUT
+                          Output .seg.nrrd filename (default: subsampled_<stem>.seg.nrrd
+                          next to the input)
+```
+
+**Examples:**
+
+```bash
+# All 3 axes at default step of 15:
+python subsample_segment.py scan.nrrd brain.seg.nrrd
+
+# Axis 0 only, every 10 slices:
+python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10
+
+# Axis 0 every 10, axis 1 every 15:
+python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10 1,15
+
+# All axes with mixed steps, custom output name:
+python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10 1,15 2,10 -o seeds.seg.nrrd
+
+# Then run biomedisa (--allaxis required for multi-axis seeds):
+python -m biomedisa.interpolation scan.nrrd subsampled_brain.seg.nrrd --allaxis
+```
+
+### `restore_segmentation_dimensions.py`
+
+Restores a cropped `.seg.nrrd` to the full dimensions of an original segmentation,
+reversing the crop that 3D Slicer applies on save. This is needed before running biomedisa
+Smart Interpolation, which requires the input label segmentation to be the same dimensions
+as the volume. For some reason, Slicer crops the edited subsampled segmentation on save
+even when directed not to (this is a bug).
+
+The script reads the target dimensions from the original segmentation, computes the voxel-space
+offset from the shifted space origin, embeds the cropped data in a zero-padded array of the correct
+size, and writes a corrected `.seg.nrrd` with the origin restored to `(0, 0, 0)`.
+
+```text
+usage: restore_segmentation_dimensions.py [-h] ORIGINAL CROPPED OUTPUT
+
+positional arguments:
+    ORIGINAL    Original segmentation file (provides target dimensions)
+    CROPPED     Cropped segmentation file to restore (e.g. output from biomedisa)
+    OUTPUT      Output path for the restored file
+
+options:
+    -h, --help  show this help message and exit
+```
+
+**Example:**
+
+```bash
+python restore_segmentation_dimensions.py \
+    Segmentation.seg.nrrd \
+    biomedisa_result.seg.nrrd \
+    restored_Segmentation.seg.nrrd
+```
+
+**Typical workflow:**
+
+1. `subsample_segment.py` — thin out a Slicer segmentation to create sparse seeds
+2. `biomedisa.interpolation` — run Smart Interpolation to fill in the full volume
+3. `restore_segmentation_dimensions.py` — pad the biomedisa output back to the original dimensions so it re-loads correctly in Slicer
 
 
 ## Requirements
