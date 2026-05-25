@@ -200,6 +200,29 @@ options:
     -v, --verbose         Enable verbose output
 ```
 
+### `extract-pca-data.py`
+
+Recursively searches a directory for Zeiss `.pca` files (INI-format scan parameter files) and
+assembles selected fields into a single CSV. Extracted fields are: voxel size, exposure time,
+frame averaging count, skip frames, X-ray voltage, and X-ray current.
+
+```text
+usage: extract-pca-data.py [-h] search_path [output]
+
+positional arguments:
+    search_path  Root directory to search for .pca files (searched recursively)
+    output       Output CSV file path (default: pca_data.csv)
+
+options:
+    -h, --help   show this help message and exit
+```
+
+**Example:**
+
+```bash
+python extract-pca-data.py /data/scans all_scans.csv
+```
+
 ### `subsample_segment.py`
 
 Creates a subsampled segmentation NRRD for [biomedisa](https://biomedisa.info/) Smart Interpolation.
