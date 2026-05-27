@@ -10,25 +10,28 @@ that can be passed directly to biomedisa.interpolation with --allaxis.
 
 Usage
 -----
-python subsample_segment.py CT_VOLUME.nrrd SEGMENTATION.seg.nrrd [options]
+python subsample_segment.py SEGMENTATION.seg.nrrd [options]
 
     --step [AXIS,STEP ...]  Keep one slice every STEP slices along AXIS.
                       Provide one or more AXIS,STEP pairs (no spaces around comma).
                       Valid axes: 0, 1, 2.  STEP must be >= 2.
                       Omit entirely to sample all 3 axes at step 15.
+    --segments NAME [NAME ...]
+                      Names of segments to include in the merged volume.
+                      If omitted, all segments are included.
     -o OUTPUT         Output .seg.nrrd filename
                       (default: subsampled_<stem>.seg.nrrd next to the input).
 
 Examples
 --------
 # Axis 0 only, every 10 slices:
-python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10
+python subsample_segment.py brain.seg.nrrd --step 0,10
 
 # Axis 0 every 10, axis 1 every 15:
-python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10 1,15
+python subsample_segment.py brain.seg.nrrd --step 0,10 1,15
 
 # All axes with mixed steps:
-python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10 1,15 2,10
+python subsample_segment.py brain.seg.nrrd --step 0,10 1,15 2,10
 
 # Then run biomedisa (--allaxis required for multi-axis seeds):
 python -m biomedisa.interpolation scan.nrrd subsampled_brain.nrrd --allaxis
@@ -228,11 +231,6 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "ct_volume",
-        metavar="CT_VOLUME.nrrd",
-        help="Path to the CT scan NRRD file (passed unchanged to biomedisa).",
-    )
-    parser.add_argument(
         "seg_nrrd",
         metavar="SEGMENTATION.seg.nrrd",
         help="Path to the 3D Slicer segmentation file.",
@@ -251,6 +249,16 @@ def main():
         ),
     )
     parser.add_argument(
+        "--segments",
+        nargs="+",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Names of segments to include in the merged volume. "
+            "If omitted, all segments are included."
+        ),
+    )
+    parser.add_argument(
         "-o",
         "--output",
         default=None,
@@ -258,11 +266,8 @@ def main():
     )
     args = parser.parse_args()
 
-    ct_path = Path(args.ct_volume)
     seg_path = Path(args.seg_nrrd)
 
-    if not ct_path.exists():
-        sys.exit(f"Error: CT volume not found: {ct_path}")
     if not seg_path.exists():
         sys.exit(f"Error: Segmentation file not found: {seg_path}")
 
@@ -286,7 +291,6 @@ def main():
         out_path = seg_path.parent / f"subsampled_{stem}.seg.nrrd"
 
     axes_desc = ", ".join(f"axis-{a}={s}" for a, s in axis_steps)
-    print(f"CT volume   : {ct_path}")
     print(f"Segmentation: {seg_path}")
     print(f"Steps       : {axes_desc}")
     print(f"Output      : {out_path}\n")
@@ -301,10 +305,21 @@ def main():
     segments = read_segments(header)
     if not segments:
         sys.exit("Error: No segments found in the segmentation file header.")
+
+    if args.segments is not None:
+        requested = set(args.segments)
+        segments = [s for s in segments if s.get("Name", "") in requested]
+        matched = {s.get("Name", "") for s in segments}
+        missing = requested - matched
+        if missing:
+            sys.exit(f"Error: Segment(s) not found: {', '.join(sorted(missing))}")
+        if not segments:
+            sys.exit("Error: No segments remain after filtering.")
+
     print(f"\nFound {len(segments)} segment(s):")
 
     # ------------------------------------------------------------------
-    # Merge all segments into a single 3-D label volume
+    # Merge selected segments into a single 3-D label volume
     # ------------------------------------------------------------------
     label_vol, seg_label_pairs = merge_segments(data, segments)
 
@@ -336,7 +351,7 @@ def main():
     # ------------------------------------------------------------------
     allaxis = " --allaxis" if len(axis_steps) > 1 else ""
     print("Run biomedisa Smart Interpolation with:")
-    print(f"  python -m biomedisa.interpolation \"{ct_path}\" \"{out_path}\"{allaxis}")
+    print(f"  python -m biomedisa.interpolation <CT_VOLUME.nrrd> \"{out_path}\"{allaxis}")
 
 
 if __name__ == "__main__":
