@@ -86,6 +86,14 @@ def main():
     crop_data, crop_header = nrrd.read(args.cropped, index_order="F")
     print(f"Cropped array shape:               {list(crop_data.shape)}")
 
+    # If the original has more dimensions than the cropped data (e.g., the original
+    # is a 4D multi-segment file with a leading segment-count axis while the cropped
+    # file is a plain 3D spatial volume), use only the trailing spatial dimensions.
+    ndim = crop_data.ndim
+    if len(target_sizes) > ndim:
+        target_sizes = target_sizes[-ndim:]
+        print(f"Spatial target sizes (trimmed):    {target_sizes}")
+
     # 3. Compute voxel offsets from the shifted space origin.
     #    With index_order='F', axis i of the array corresponds to space direction i,
     #    so origin[i] / voxel_size[i] gives the voxel offset along axis i.
