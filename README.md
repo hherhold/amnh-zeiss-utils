@@ -231,11 +231,11 @@ retains only every Nth slice along the specified axes (zeroing all other voxels)
 passed directly to `biomedisa.interpolation` with `--allaxis`.
 
 ```text
-usage: subsample_segment.py [-h] [--step [AXIS,STEP ...]] [-o OUTPUT]
-                            CT_VOLUME.nrrd SEGMENTATION.seg.nrrd
+usage: subsample_segment.py [-h] [--step [AXIS,STEP ...]]
+                            [--segments NAME [NAME ...]] [-o OUTPUT]
+                            SEGMENTATION.seg.nrrd
 
 positional arguments:
-    CT_VOLUME.nrrd        Path to the CT scan NRRD file (passed unchanged to biomedisa)
     SEGMENTATION.seg.nrrd Path to the 3D Slicer segmentation file
 
 options:
@@ -245,6 +245,9 @@ options:
                           more AXIS,STEP pairs (no spaces around comma). Valid axes: 0,
                           1, 2. STEP must be >= 2. Omit entirely to sample all 3 axes
                           at step 15.
+    --segments NAME [NAME ...]
+                          Names of segments to include in the merged volume.
+                          If omitted, all segments are included.
     -o OUTPUT, --output OUTPUT
                           Output .seg.nrrd filename (default: subsampled_<stem>.seg.nrrd
                           next to the input)
@@ -254,16 +257,19 @@ options:
 
 ```bash
 # All 3 axes at default step of 15:
-python subsample_segment.py scan.nrrd brain.seg.nrrd
+python subsample_segment.py brain.seg.nrrd
 
 # Axis 0 only, every 10 slices:
-python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10
+python subsample_segment.py brain.seg.nrrd --step 0,10
 
 # Axis 0 every 10, axis 1 every 15:
-python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10 1,15
+python subsample_segment.py brain.seg.nrrd --step 0,10 1,15
 
 # All axes with mixed steps, custom output name:
-python subsample_segment.py scan.nrrd brain.seg.nrrd --step 0,10 1,15 2,10 -o seeds.seg.nrrd
+python subsample_segment.py brain.seg.nrrd --step 0,10 1,15 2,10 -o seeds.seg.nrrd
+
+# Include only specific segments by name:
+python subsample_segment.py brain.seg.nrrd --segments "Endocast" "Cranium"
 
 # Then run biomedisa (--allaxis required for multi-axis seeds):
 python -m biomedisa.interpolation scan.nrrd subsampled_brain.seg.nrrd --allaxis
