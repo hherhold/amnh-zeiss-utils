@@ -20,6 +20,28 @@ standalone (apart from setting up python dependencies in an environment, see
 below) and you can run scripts here on any machine. This means that changes to
 Zeiss' proprietary file format may break this code.
 
+## TL;DR - `txrm-monitor.py` at AMNH MIF
+
+If you're here for the Zeiss metadata scanner, `txrm-monitor.py`, here's the short
+version. 
+
+ - Nearly everything is run from an anaconda powershell prompt, available from
+   the Start menu on the Zeiss machine (if you're logged in as 'Zeiss'.)
+ - It is installed in `c:\Users\Zeiss\amnh-zeiss-utils`
+ - To update the repo with the latest version: 
+   - `cd c:\Users\Zeiss\amnh-zeiss-utils`
+   - `git pull`
+ - To run the program:
+   - `cd c:\Users\Zeiss\amnh-zeiss-utils`
+   - `conda activate amnh-zeiss-utils`
+   - `python txrm-monitor.py`
+
+OR
+
+Unzip the txrm-monitor.zip folder and double-click on it. This is relatively
+untested, however - I don't have a lot of experience with pyinstaller, which is
+what I used to make the .exe file.
+
 ## Programs
 
 ### `txrm-monitor.py`
@@ -30,9 +52,11 @@ using Claude Sonnet 4.5 and 4.6 inside VS Code with Github Copilot.
 
 **Features:**
 - Monitors configured directories recursively (scans subdirectories)
-- Configurable scan interval (default 5 minutes) and file-stability window (default 10 minutes)
+- Configurable scan interval (default 5 minutes) and file-stability window (default 10 
+  minutes)
 - Monitors `.txrm` files, `.txm` files, or both — selectable in Preferences
-- Automatically extracts metadata when a file has not changed size for the stability duration
+- Automatically extracts metadata when a file has not changed size for the stability
+  duration
 - Saves metadata to `.txrm.txt` / `.txm.txt` files alongside source files
 - Daily-rotated logging to a configurable log directory (default `logs/`)
 - Real-time log viewer in GUI
@@ -40,7 +64,9 @@ using Claude Sonnet 4.5 and 4.6 inside VS Code with Github Copilot.
 - Countdown timer for next scan
 - Manual "Scan Now" button for immediate scanning
 - "Process Selected Now" button to force immediate metadata extraction for a selected file
-- Drag-and-drop support: drop `.txrm` / `.txm` files **or folders** onto the window for immediate processing (no stability wait); folders are scanned recursively and all matching files are processed
+- Drag-and-drop support: drop `.txrm` / `.txm` files **or folders** onto the window for
+  immediate processing (no stability wait); folders are scanned recursively and all
+  matching files are processed
 - Preferences panel for all configurable settings (see below)
 - All settings persisted in `txrm-monitor-config.json`
 
@@ -75,7 +101,8 @@ The application provides a graphical interface where you can:
 2. View the list of monitored files and their status
 3. See real-time log output
 4. Trigger manual scans or force-process a selected file
-5. Drag and drop `.txrm` / `.txm` files **or folders** onto the window to process them immediately (folders are scanned recursively)
+5. Drag and drop `.txrm` / `.txm` files **or folders** onto the window to process them
+   immediately (folders are scanned recursively)
 
 The window can be minimized while the application continues to run in the
 background. Closing the window exits the application.
