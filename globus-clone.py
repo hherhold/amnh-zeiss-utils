@@ -277,7 +277,7 @@ def main():
         return
 
     tdata = globus_sdk.TransferData(
-        tc, args.collection_id, args.dest_collection_id,
+        args.collection_id, args.dest_collection_id,
         label=args.label, sync_level="checksum", verify_checksum=True)
     for src, dst in plan:
         tdata.add_item(src, dst)
