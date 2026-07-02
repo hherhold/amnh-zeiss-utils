@@ -1,24 +1,38 @@
 # amnh-zeiss-utils
 
-Warning: This repo is somewhat mis-named as there are utilities for other tasks such as
-handling slicer segmentation files, etc. It's a bit of a dumping ground for scripts used
-to facilitate CT analysis. With that out of the way...
+**Warning:** This repo is somewhat mis-named as there are utilities for other tasks such
+as handling slicer segmentation files, tracking GE metadata, etc. It's a bit of a dumping
+ground for scripts used to facilitate CT analysis, much of it designed specifically for
+the Microscopy and Imaging Facility at AMNH. What this means is:
+ - No warranties expressed or implied
+ - No suitability of purpose
+ - This code may screw up your data (unlikely but the risk is on you)
+ - Your mileage may vary
+ - You get the idea
+ - It is assumed that you are familiar with running python scripts from the command line
+and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with
+the required packages. (But see Requirements section, below.)
 
-Utilities for handling Zeiss txm and txrm files, specifically micro-CT files.
-These python scripts allow extraction of metadata from unreconstructed
-('`txrm`') and reconstructed ('`txm`') files, as well as converting
-reconstructed ('`txm`') files to TIFF stacks or NRRD files. (You can convert
-unreconstruced files too, not sure why you'd want to.) There are also some
-utilities for OLE files (the format Zeiss uses for these files.) 
+With that out of the way...
 
-It is assumed that you are familiar with running python scripts from the command
-line and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is
-included with the required packages. (But see Requirements section, below.)
+This repo contains for:
 
-Note that this repo does not rely on any Zeiss proprietary libraries and is
-standalone (apart from setting up python dependencies in an environment, see
-below) and you can run scripts here on any machine. This means that changes to
-Zeiss' proprietary file format may break this code.
+ - Handling Zeiss txm and txrm files, specifically micro-CT files. These python scripts
+allow extraction of metadata from unreconstructed ('`txrm`') and reconstructed ('`txm`')
+files, as well as converting reconstructed ('`txm`') files to TIFF stacks or NRRD files.
+(You can convert unreconstruced files too, not sure why you'd want to.) There are also
+some utilities for OLE files (the format Zeiss uses for these files.) 
+
+ - Walking globus directory trees/collections to find specific file types. This is used
+   for hunting for (and retrieving) PCA and PCR files.
+
+ - Scanning PCA and PCR files (from a GE scanner) for metadata and putting it in a small
+   local database for report generation, etc. 
+
+Note that this repo does not rely on any proprietary libraries (such as Zeiss) and is
+standalone (apart from setting up python dependencies in an environment, see below) and
+you can run scripts here on any machine. This means that changes to Zeiss' (or anybody
+else's) proprietary file format may break this code.
 
 ## TL;DR - `txrm-monitor.py` at AMNH MIF
 
@@ -341,6 +355,165 @@ python restore_segmentation_dimensions.py \
 2. `biomedisa.interpolation` — run Smart Interpolation to fill in the full volume
 3. `restore_segmentation_dimensions.py` — pad the biomedisa output back to the original dimensions so it re-loads correctly in Slicer
 
+
+### `ge_scan_db.py`
+
+**What it does**
+
+Crawls a directory tree of GE / phoenix|x-ray CT metadata files (`.pca`
+acquisition parameters, `.pcr` reconstruction parameters) and builds a SQLite
+database with **one record per scan**, to enable reports and searches on scan
+metadata. Standard library only — no extra packages beyond a base Python.
+
+- **One record per scan-root.** Every `.pca` that is *not* inside a `ScanN`
+  subdirectory becomes one record. Sibling folders for the same specimen (e.g.
+  `… fem`, `… fib`, `… tibia`) are recorded as separate scans.
+- **Multi-scan detection by directory structure.** Larger specimens scanned in
+  pieces and stitched together have `Scan1/`, `Scan2/`, … subdirectories. Those
+  records are flagged `multiscan = 1` and each tile is stored as a sub-scan.
+  (Detection uses the `ScanN` directories rather than the `[Multiscan] Active`
+  flag, which is set even on single scans.)
+- **pca/pcr overlap verification.** For each `.pca`/`.pcr` pair, every parameter
+  present in both files is compared (numeric-aware, with tolerance) and any
+  disagreement is logged to a `parse_issue` table rather than aborting the crawl.
+- **Handles both file layouts.** Modern (`[Xray]`, `[Image]`, …) and legacy 2013
+  (`[XRAY]`, `[ACQUISITION]`, `Voxelsize`, …) phoenix|x-ray layouts resolve to
+  the same columns via case-insensitive lookup with fallback keys.
+
+**Usage**
+
+```bash
+# Build the database from a tree of .pca/.pcr files
+python ge_scan_db.py build  --root pca_test --db scans.sqlite [--force]
+
+# Print a summary (scan counts, kV distribution, overlap mismatches)
+python ge_scan_db.py report --db scans.sqlite
+
+# Run an arbitrary SQL SELECT against the database
+python ge_scan_db.py query  --db scans.sqlite \
+    --sql "SELECT specimen, voltage_kv, voxel_size_x FROM scan WHERE multiscan=1"
+```
+
+**Schema**
+
+- `scan` — one row per scan, with promoted acquisition columns (kV, µA, voxel
+  size, FDD/FOD, magnification, image count, detector, …) and reconstruction
+  columns (recon voxel size, volume/ROI dimensions, filter kernel).
+- `subscan` — one row per `ScanN` tile of a multi-scan, linked to its `scan`.
+- `raw_param` — every `section.key = value` from every file, so no metadata is
+  lost and any field is queryable even if it was not promoted to a column.
+- `parse_issue` — pca/pcr overlap mismatches and any parse problems.
+
+### Globus utilities — `globus-tree.py`, `globus-find.py`, `globus-clone.py`
+
+A small family of tools for browsing and pulling files from a
+[Globus](https://www.globus.org/) collection (endpoint) using the Globus SDK,
+without needing the data mounted locally. They are useful for inspecting a remote
+data repository and selectively cloning files (e.g. just the `.pca`/`.pcr`
+metadata files) to a local Globus Connect Personal endpoint.
+
+**Authentication.** All three use the Globus Native App OAuth flow. On first run
+you are prompted to visit a URL, log in, and paste back an authorization code.
+Tokens are then cached in `~/.globus-tree-tokens.json` and shared by all three
+tools, so subsequent runs don't require re-login. These scripts require the
+`globus_sdk` package.
+
+Common options: `-c/--collection-id` selects the source collection, `-p/--path`
+sets the starting path on it, and `-d/--max-depth` limits how deep the recursion
+descends (the starting path is depth 0).
+
+#### `globus-tree.py`
+
+Generates a `tree`-style directory listing for a path on a Globus collection and
+writes it to a file.
+
+```text
+usage: globus-tree.py [-h] -c COLLECTION_ID [-p PATH] -o OUTPUT_FILE
+                      [-d MAX_DEPTH]
+
+options:
+    -h, --help            show this help message and exit
+    -c, --collection-id COLLECTION_ID
+                          Globus collection (endpoint) ID
+    -p, --path PATH       Starting path on the collection
+    -o, --output-file OUTPUT_FILE
+                          Output file for the tree
+    -d, --max-depth MAX_DEPTH
+                          Maximum directory depth to descend (default: unlimited)
+```
+
+#### `globus-find.py`
+
+Recursively finds files matching a shell-style glob pattern on a Globus
+collection path and prints the matching paths (optionally also writing them to a
+file).
+
+```text
+usage: globus-find.py [-h] -c COLLECTION_ID [-p PATH] [-o OUTPUT_FILE]
+                      [-d MAX_DEPTH] [-i]
+                      pattern
+
+positional arguments:
+    pattern               Shell-style glob pattern to match file names against,
+                          e.g. "*.pc[a,r]". Quote it so the shell doesn't expand it.
+
+options:
+    -h, --help            show this help message and exit
+    -c, --collection-id COLLECTION_ID
+                          Globus collection (endpoint) ID
+    -p, --path PATH       Starting path on the collection
+    -o, --output-file OUTPUT_FILE
+                          Optional file to also write matching paths to
+    -d, --max-depth MAX_DEPTH
+                          Maximum directory depth to descend (default: unlimited)
+    -i, --ignore-case     Match the pattern case-insensitively
+```
+
+#### `globus-clone.py`
+
+Finds files matching a glob pattern on a source collection and clones them —
+preserving their directory structure — to a destination Globus collection,
+typically your local Globus Connect Personal collection. The matched files are
+placed under `--dest-path`, recreating their paths relative to the source
+`--path`. Use `-n/--dry-run` to preview what would be transferred.
+
+```text
+usage: globus-clone.py [-h] -c COLLECTION_ID [-p PATH] -C DEST_COLLECTION_ID
+                       -P DEST_PATH [-d MAX_DEPTH] [-i] [-n] [-w] [-l LABEL]
+                       pattern
+
+positional arguments:
+    pattern               Shell-style glob pattern to match file names against,
+                          e.g. "*.pc[a,r]". Quote it so the shell doesn't expand it.
+
+options:
+    -h, --help            show this help message and exit
+    -c, --collection-id COLLECTION_ID
+                          Source Globus collection (endpoint) ID
+    -p, --path PATH       Source starting path on the collection
+    -C, --dest-collection-id DEST_COLLECTION_ID
+                          Destination Globus collection (endpoint) ID -- typically
+                          your local Globus Connect Personal collection.
+    -P, --dest-path DEST_PATH
+                          Destination base path. Matched files are placed under
+                          here, recreating their paths relative to the source --path.
+    -d, --max-depth MAX_DEPTH
+                          Maximum directory depth to descend (default: unlimited)
+    -i, --ignore-case     Match the pattern case-insensitively
+    -n, --dry-run         List the matched files and where they would be cloned to,
+                          but don't submit a transfer.
+    -w, --wait            Wait for the transfer to finish before exiting.
+    -l, --label LABEL     Label for the Globus transfer task (default: globus-clone)
+```
+
+**Example** — clone every `.pca` and `.pcr` metadata file from a remote
+collection to a local endpoint, mirroring the directory structure:
+
+```bash
+python globus-clone.py "*.pc[a,r]" \
+    -c SOURCE_COLLECTION_ID -p /data/scans \
+    -C LOCAL_COLLECTION_ID  -P /home/me/pca_test
+```
 
 ## Requirements
 
