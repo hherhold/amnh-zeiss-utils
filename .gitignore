@@ -215,3 +215,7 @@ pca_test/
 
 # GE scan database file
 scans.sqlite
+
+# Config file for Zeiss TXRM monitor. Created by the app on startup and is
+# machine-specific.
+txrm-monitor-config.json
