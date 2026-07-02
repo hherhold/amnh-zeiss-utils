@@ -209,3 +209,9 @@ __marimo__/
 
 # Anything in the .vscode directory
 .vscode/
+
+# Data files for various project testing
+pca_test/
+
+# GE scan database file
+scans.sqlite
