@@ -40,6 +40,14 @@ def _read_ole_uint32(ole, path):
     return struct.unpack_from('<I', data)[0]
 
 
+def _read_ole_float32(ole, path):
+    """Read a single little-endian float32 from an OLE stream."""
+    if not ole.exists(path):
+        return None
+    data = ole.openstream(path).read()
+    return struct.unpack_from('<f', data)[0]
+
+
 # DataType values used by Zeiss: 5 = uint16, 10 = float32.
 _DATA_TYPE_MAP = {5: np.uint16, 10: np.float32}
 
@@ -48,12 +56,14 @@ def read_txm(file_name):
     """
     Read image volume from a Zeiss .txm (or .txrm) OLE file.
 
-    Returns a numpy array of shape (n_images, height, width) in the file's
-    native dtype (uint16 or float32), or None on error.
+    Returns a tuple (volume, pixel_size_um) where volume is a numpy array of
+    shape (n_images, height, width) in the file's native dtype (uint16 or
+    float32) and pixel_size_um is the isotropic voxel size in microns (or None
+    if not present). Returns (None, None) on error.
     """
     if not olefile.isOleFile(file_name):
         print(f"Error: '{file_name}' is not a valid OLE file.", file=sys.stderr)
-        return None
+        return None, None
 
     with olefile.OleFileIO(file_name) as ole:
         n_images = _read_ole_uint32(ole, 'ImageInfo/NoOfImages')
@@ -63,12 +73,15 @@ def read_txm(file_name):
 
         if None in (n_images, width, height, dtype_id):
             print("Error: could not read required ImageInfo fields.", file=sys.stderr)
-            return None
+            return None, None
 
         img_dtype = _DATA_TYPE_MAP.get(dtype_id)
         if img_dtype is None:
             print(f"Error: unsupported DataType value {dtype_id}.", file=sys.stderr)
-            return None
+            return None, None
+
+        # Isotropic voxel size, stored in microns.
+        pixel_size_um = _read_ole_float32(ole, 'ImageInfo/PixelSize')
 
         volume = np.empty((n_images, height, width), dtype=img_dtype)
 
@@ -84,11 +97,11 @@ def read_txm(file_name):
             arr  = np.frombuffer(raw, dtype=np.dtype(img_dtype).newbyteorder('<'))
             volume[i] = arr.reshape(height, width)
 
-    return volume
+    return volume, pixel_size_um
 
 
 def main():
-    scan_volume = read_txm(args.input_txm_file)
+    scan_volume, pixel_size_um = read_txm(args.input_txm_file)
     if scan_volume is None:
         print(f"Error: Could not read input file {args.input_txm_file}. Exiting.")
         return
@@ -99,9 +112,25 @@ def main():
     if args.verbose:
         print(f"Scan volume shape: {scan_volume.shape}")
 
-    nrrd.write(args.output_nrrd_file, scan_volume, compression_level=1, index_order='C')
+    header = {}
+    if pixel_size_um is not None:
+        # PixelSize is stored in microns; NRRD/Slicer coordinates are in mm.
+        voxel_size_mm = pixel_size_um / 1000.0
+        # Define a full LPS coordinate space so ITK-based readers (3D Slicer)
+        # accept the file. The voxel is isotropic, so the space-directions
+        # matrix is diag(v, v, v) regardless of axis order.
+        header['space'] = 'left-posterior-superior'
+        header['space directions'] = np.diag([voxel_size_mm] * scan_volume.ndim)
+        header['space origin'] = [0.0] * scan_volume.ndim
+        header['space units'] = ['mm'] * scan_volume.ndim
+        if args.verbose:
+            print(f"Pixel size: {pixel_size_um} um ({voxel_size_mm} mm)")
+    else:
+        print("WARNING - PixelSize not found in input file; voxel size not set.",
+              file=sys.stderr)
 
-    print("WARNING - Voxel size has not been set. This may be fixed in future versions.")
+    nrrd.write(args.output_nrrd_file, scan_volume, header,
+               compression_level=1, index_order='C')
 
 if __name__ == "__main__":
     main()
