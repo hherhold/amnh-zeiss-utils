@@ -8,14 +8,16 @@ the Microscopy and Imaging Facility at AMNH. What this means is:
  - No suitability of purpose
  - This code may screw up your data (unlikely but the risk is on you)
  - Your mileage may vary
+ - Don't run with scissors
  - You get the idea
- - It is assumed that you are familiar with running python scripts from the command line
+
+It is assumed that you are familiar with running python scripts from the command line
 and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with
 the required packages. (But see Requirements section, below.)
 
 With that out of the way...
 
-This repo contains for:
+This repo contains tools for:
 
  - Handling Zeiss txm and txrm files, specifically micro-CT files. These python scripts
 allow extraction of metadata from unreconstructed ('`txrm`') and reconstructed ('`txm`')
@@ -27,7 +29,9 @@ some utilities for OLE files (the format Zeiss uses for these files.)
    for hunting for (and retrieving) PCA and PCR files.
 
  - Scanning PCA and PCR files (from a GE scanner) for metadata and putting it in a small
-   local database for report generation, etc. 
+   local database for report generation, etc.
+
+ - Tools for handling Slicer files, and translating file formats for Slicer. 
 
 Note that this repo does not rely on any proprietary libraries (such as Zeiss) and is
 standalone (apart from setting up python dependencies in an environment, see below) and
