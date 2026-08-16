@@ -408,7 +408,7 @@ python ge_scan_db.py query  --db scans.sqlite \
   lost and any field is queryable even if it was not promoted to a column.
 - `parse_issue` — pca/pcr overlap mismatches and any parse problems.
 
-### Globus utilities — `globus-tree.py`, `globus-find.py`, `globus-clone.py`
+### Globus utilities — `globus-tree.py`, `globus-find.py`, `globus-clone.py`, `tree-viewer.py`
 
 A small family of tools for browsing and pulling files from a
 [Globus](https://www.globus.org/) collection (endpoint) using the Globus SDK,
@@ -416,11 +416,12 @@ without needing the data mounted locally. They are useful for inspecting a remot
 data repository and selectively cloning files (e.g. just the `.pca`/`.pcr`
 metadata files) to a local Globus Connect Personal endpoint.
 
-**Authentication.** All three use the Globus Native App OAuth flow. On first run
-you are prompted to visit a URL, log in, and paste back an authorization code.
-Tokens are then cached in `~/.globus-tree-tokens.json` and shared by all three
-tools, so subsequent runs don't require re-login. These scripts require the
-`globus_sdk` package.
+**Authentication.** The three `globus-*` tools use the Globus Native App OAuth
+flow. On first run you are prompted to visit a URL, log in, and paste back an
+authorization code. Tokens are then cached in `~/.globus-tree-tokens.json` and
+shared by all three tools, so subsequent runs don't require re-login. These
+scripts require the `globus_sdk` package. (`tree-viewer.py` is an offline GUI for
+reading what `globus-tree.py` wrote — it needs neither the SDK nor a login.)
 
 Common options: `-c/--collection-id` selects the source collection, `-p/--path`
 sets the starting path on it, and `-d/--max-depth` limits how deep the recursion
@@ -517,6 +518,56 @@ collection to a local endpoint, mirroring the directory structure:
 python globus-clone.py "*.pc[a,r]" \
     -c SOURCE_COLLECTION_ID -p /data/scans \
     -C LOCAL_COLLECTION_ID  -P /home/me/pca_test
+```
+
+#### `tree-viewer.py`
+
+A PySide6 GUI for browsing and searching the listings that `globus-tree.py`
+writes — a "remote ls" you can explore offline, without touching the collection.
+These listings get big — a depth-4 listing of `/John_Flynn` is 156 MB and 2.6
+million entries, and a depth-5 listing is 395 MB and 6.1 million — so the viewer
+indexes the file into flat arrays rather than building per-entry objects. Loading
+the 156 MB listing takes about 4 seconds (8 for the 395 MB one), and searching
+every name in it takes well under a second. Expect memory use of roughly three
+times the size of the listing.
+
+```text
+usage: tree-viewer.py [-h] [--no-cache] [listing]
+
+positional arguments:
+    listing               Tree listing file to open on startup
+
+options:
+    -h, --help            show this help message and exit
+    --no-cache            Do not read or write the parsed-listing cache in
+                          ~/.tree-viewer-cache
+```
+
+The window is a WinDirStat-style expandable tree. Each folder shows how many
+files and folders lie beneath it, and the **Share of parent** column draws a
+proportional bar, so the directories holding all the data are obvious at a
+glance. Click a column header to sort siblings by name or by item count.
+
+The **Find** bar searches every name in the listing. *Contains* does a plain
+substring match; *Glob* matches whole names against a shell-style pattern such
+as `*.nrrd` or `AMNH*skull*`. Results can be narrowed to files or folders only.
+Double-click a result (or right-click → *Show in tree*) to expand the tree down
+to it. Right-click gives you *Copy full path* and *Copy collection:path*, which
+paste straight into `globus-clone.py`.
+
+Folders listed at the listing's depth limit are shown as **not scanned** —
+`globus-tree.py --max-depth` names those directories but never descends into
+them, so an empty-looking folder there just means the scan stopped, not that the
+folder is empty.
+
+Parsed listings are cached under `~/.tree-viewer-cache`, keyed by path, size and
+modification time, which makes reopening the same listing near-instant (0.5 s
+instead of 4 s for the 156 MB example). Pass `--no-cache` to disable this.
+
+```bash
+# Generate a listing, then browse it offline
+python globus-tree.py -c SOURCE_COLLECTION_ID -p /John_Flynn -d 4 -o flynn.txt
+python tree-viewer.py flynn.txt
 ```
 
 ## Requirements
