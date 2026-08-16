@@ -555,6 +555,13 @@ Double-click a result (or right-click → *Show in tree*) to expand the tree dow
 to it. Right-click gives you *Copy full path* and *Copy collection:path*, which
 paste straight into `globus-clone.py`.
 
+Results arrive in tree order; click a results header to sort by **Name**,
+**Type** or **Location**. Sorting by Type ascending lists folders before files,
+the same way the tree itself orders them, which is the quick way to pick the
+matching folders out of a pile of matching files. Whichever sort you pick sticks
+for later searches until you change it. Sorting is fast even at the 200,000-row
+result cap — under a quarter of a second.
+
 Folders listed at the listing's depth limit are shown as **not scanned** —
 `globus-tree.py --max-depth` names those directories but never descends into
 them, so an empty-looking folder there just means the scan stopped, not that the

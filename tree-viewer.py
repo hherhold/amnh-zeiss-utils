@@ -714,6 +714,8 @@ class ResultsModel(QAbstractTableModel):
         super().__init__(parent)
         self.ti = ti
         self.nodes = nodes
+        self.natural = nodes          # the order the search found them in
+        self._ranks = {}              # column -> sort rank, computed once
 
     def rowCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else len(self.nodes)
@@ -747,6 +749,71 @@ class ResultsModel(QAbstractTableModel):
 
     def node_at(self, row):
         return int(self.nodes[row])
+
+    # -- sorting -----------------------------------------------------------
+
+    def sort(self, column, order=Qt.SortOrder.AscendingOrder):
+        """Reorder the results by a column, or restore the found order.
+
+        A column outside the table (Qt passes -1 when no sort indicator is
+        set) means "as the search found them", which is tree order.
+        """
+        if len(self.natural) < 2:
+            return
+        if 0 <= column < len(self.HEADERS):
+            rank = self._rank_for(column)
+            if order == Qt.SortOrder.DescendingOrder:
+                rank = -rank
+            new = self.natural[np.argsort(rank, kind="stable")]
+        else:
+            new = self.natural
+        if np.array_equal(new, self.nodes):
+            return
+
+        self.layoutAboutToBeChanged.emit()
+        old = self.persistentIndexList()
+        kept = [(int(self.nodes[i.row()]), i.column()) for i in old]
+        self.nodes = new
+        row_of = {int(n): r for r, n in enumerate(new)}
+        self.changePersistentIndexList(
+            old, [self.createIndex(row_of[n], c) for n, c in kept])
+        self.layoutChanged.emit()
+
+    def _rank_for(self, column):
+        """An integer sort rank per row; equal ranks keep the found order.
+
+        Ranks rather than the values themselves, so that descending is just a
+        negation and ties stay stable in both directions.
+        """
+        if column in self._ranks:
+            return self._ranks[column]
+
+        ti, nodes = self.ti, self.natural
+        if column == 1:
+            # Folders before files, matching the order the tree itself uses.
+            rank = (~ti.is_dir[nodes]).astype(np.int64)
+        elif column == 0:
+            rank = self._rank_of_strings(
+                [ti.name(int(n)).lower() for n in nodes])
+        else:
+            # One path per distinct parent folder rather than one per row:
+            # a listing has a few thousand folders but the results can run to
+            # hundreds of thousands of rows.
+            uniq, inverse = np.unique(ti.parent[nodes], return_inverse=True)
+            folders = self._rank_of_strings(
+                [ti.full_path(int(p)).lower() for p in uniq])
+            rank = folders[inverse]
+
+        self._ranks[column] = rank
+        return rank
+
+    @staticmethod
+    def _rank_of_strings(values):
+        """Map a list of strings to their 0..n-1 sorted positions."""
+        order = sorted(range(len(values)), key=values.__getitem__)
+        rank = np.empty(len(values), np.int64)
+        rank[order] = np.arange(len(values), dtype=np.int64)
+        return rank
 
 
 class ShareBarDelegate(QStyledItemDelegate):
@@ -803,6 +870,7 @@ class TreeViewerWindow(QMainWindow):
         self.search_worker = None
         self.progress = None
         self.lower_buf = None
+        self.results_sort = None      # column and order, once the user picks one
         self.settings = QSettings("AMNH", "tree-viewer")
 
         self.setWindowTitle("Tree Viewer")
@@ -876,6 +944,12 @@ class TreeViewerWindow(QMainWindow):
         self.results.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results.verticalHeader().setVisible(False)
+        self.results.setSortingEnabled(True)
+        results_header = self.results.horizontalHeader()
+        # Start with no sort indicator, so results first appear in the order
+        # the search found them (tree order) until a header is clicked.
+        results_header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
+        results_header.sortIndicatorChanged.connect(self.on_results_sort_changed)
         self.results.doubleClicked.connect(self.reveal_result)
         self.results.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu)
@@ -1074,7 +1148,11 @@ class TreeViewerWindow(QMainWindow):
         self.results.setModel(self.results_model)
         self.results.setColumnWidth(0, 340)
         self.results.setColumnWidth(1, 70)
-        self.results.horizontalHeader().setStretchLastSection(True)
+        header = self.results.horizontalHeader()
+        header.setStretchLastSection(True)
+        # Carry whatever sort the user last picked over to the new results.
+        if self.results_sort is not None:
+            self.results.sortByColumn(*self.results_sort)
 
         note = f"{human(len(nodes))} match" + ("" if len(nodes) == 1 else "es")
         if capped:
@@ -1087,6 +1165,10 @@ class TreeViewerWindow(QMainWindow):
         self.search_button.setEnabled(True)
         self.results_label.setText("Search failed.")
         QMessageBox.warning(self, "Tree Viewer", f"Search failed:\n\n{message}")
+
+    def on_results_sort_changed(self, column, order):
+        """Remember the chosen sort so later searches come back the same way."""
+        self.results_sort = (column, order) if column >= 0 else None
 
     def clear_search(self):
         self.search_edit.clear()
