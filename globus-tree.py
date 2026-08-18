@@ -18,7 +18,9 @@ Claude Opus 4.8 used for initial authoring.
 import argparse
 import json
 import os
+import shutil
 import sys
+import time
 
 import globus_sdk
 from globus_sdk.scopes import TransferScopes
@@ -34,6 +36,56 @@ TEE = "├── "
 ELBOW = "└── "
 PIPE = "│   "
 SPACE = "    "
+
+
+class Status:
+    """Single-line status readout printed to stderr while the tree is walked.
+
+    There's no way to know up front how much work there is (the tree is
+    discovered as it's walked), so rather than a progress bar this shows a
+    spinner, the running counts, elapsed time, and the directory currently
+    being listed. The line is rewritten in place with a carriage return, so it
+    stays on one line and never lands in the output file.
+
+    All methods become no-ops when stderr isn't a terminal or when --quiet is
+    given, so redirected runs stay clean."""
+
+    SPINNER = "|/-\\"
+
+    def __init__(self, enabled=True):
+        self.enabled = enabled and sys.stderr.isatty()
+        self.start = time.time()
+        self.tick = 0
+        self.line_len = 0
+
+    def update(self, path, counts):
+        """Redraw the status line for the directory currently being listed."""
+        if not self.enabled:
+            return
+        elapsed = int(time.time() - self.start)
+        head = (f"{self.SPINNER[self.tick % len(self.SPINNER)]} "
+                f"{counts['dirs']} dirs, {counts['files']} files, "
+                f"{elapsed // 60}m{elapsed % 60:02d}s  ")
+        self.tick += 1
+
+        width = shutil.get_terminal_size((80, 24)).columns - 1
+        room = max(width - len(head), 0)
+        if len(path) > room:
+            # Keep the tail of the path -- the deep end is the informative part.
+            path = "..." + path[-(room - 3):] if room > 3 else ""
+        line = head + path
+        # Pad to the previous length so a longer old line is fully erased.
+        sys.stderr.write("\r" + line.ljust(self.line_len))
+        sys.stderr.flush()
+        self.line_len = len(line)
+
+    def clear(self):
+        """Erase the status line so other output isn't written on top of it."""
+        if not self.enabled or not self.line_len:
+            return
+        sys.stderr.write("\r" + " " * self.line_len + "\r")
+        sys.stderr.flush()
+        self.line_len = 0
 
 
 def load_tokens():
@@ -97,13 +149,15 @@ def _on_refresh(token_response):
         json.dump(existing, f)
 
 
-def list_dir(tc, collection_id, path):
+def list_dir(tc, collection_id, path, status=None):
     """Return (dirs, files) name lists for a directory, sorted, dirs first.
 
     Returns (None, None) if the directory can't be read (permissions, etc.)."""
     try:
         entries = tc.operation_ls(collection_id, path=path)
     except globus_sdk.TransferAPIError as e:
+        if status is not None:
+            status.clear()
         print(f"  ! could not list {path}: {e.message}", file=sys.stderr)
         return None, None
 
@@ -120,13 +174,15 @@ def join_path(base, name):
 
 
 def write_tree(tc, collection_id, path, out, prefix="", counts=None,
-               depth=0, max_depth=None):
+               depth=0, max_depth=None, status=None):
     """Recursively write the tree for `path` into the `out` file handle.
 
     `max_depth` of None means unlimited; otherwise recursion stops descending
     into directories once `depth` reaches `max_depth` (the starting path is
     depth 0, its immediate children are depth 1, and so on)."""
-    dirs, files = list_dir(tc, collection_id, path)
+    if status is not None:
+        status.update(path, counts)
+    dirs, files = list_dir(tc, collection_id, path, status)
     if dirs is None:
         return
 
@@ -142,7 +198,8 @@ def write_tree(tc, collection_id, path, out, prefix="", counts=None,
                 continue
             extension = SPACE if is_last else PIPE
             write_tree(tc, collection_id, join_path(path, name), out,
-                       prefix + extension, counts, depth + 1, max_depth)
+                       prefix + extension, counts, depth + 1, max_depth,
+                       status)
         else:
             counts["files"] += 1
 
@@ -160,6 +217,8 @@ def main():
     parser.add_argument("-d", "--max-depth", type=int, default=None,
                         help="Maximum directory depth to descend (default: "
                              "unlimited). The starting path is depth 0.")
+    parser.add_argument("-q", "--quiet", action="store_true",
+                        help="Suppress the progress status line.")
 
     args = parser.parse_args()
 
@@ -178,11 +237,22 @@ def main():
         sys.exit(1)
 
     counts = {"dirs": 0, "files": 0}
-    with open(args.output_file, "w", encoding="utf-8") as out:
-        out.write(f"{ep_name}:{args.path}\n")
-        write_tree(tc, args.collection_id, args.path, out, counts=counts,
-                   max_depth=args.max_depth)
-        out.write(f"\n{counts['dirs']} directories, {counts['files']} files\n")
+    status = Status(enabled=not args.quiet)
+    try:
+        with open(args.output_file, "w", encoding="utf-8") as out:
+            out.write(f"{ep_name}:{args.path}\n")
+            write_tree(tc, args.collection_id, args.path, out, counts=counts,
+                       max_depth=args.max_depth, status=status)
+            out.write(f"\n{counts['dirs']} directories, "
+                      f"{counts['files']} files\n")
+    except KeyboardInterrupt:
+        status.clear()
+        print(f"Interrupted -- partial tree left in {args.output_file} "
+              f"({counts['dirs']} directories, {counts['files']} files).",
+              file=sys.stderr)
+        sys.exit(1)
+    finally:
+        status.clear()
 
     print(f"Wrote tree to {args.output_file} "
           f"({counts['dirs']} directories, {counts['files']} files).")

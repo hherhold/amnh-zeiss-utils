@@ -434,7 +434,7 @@ writes it to a file.
 
 ```text
 usage: globus-tree.py [-h] -c COLLECTION_ID [-p PATH] -o OUTPUT_FILE
-                      [-d MAX_DEPTH]
+                      [-d MAX_DEPTH] [-q]
 
 options:
     -h, --help            show this help message and exit
@@ -445,7 +445,21 @@ options:
                           Output file for the tree
     -d, --max-depth MAX_DEPTH
                           Maximum directory depth to descend (default: unlimited)
+    -q, --quiet           Suppress the progress status line
 ```
+
+While it runs, a one-line status readout is rewritten in place on stderr showing
+a spinner, the running directory and file counts, elapsed time, and the
+directory currently being listed:
+
+```text
+/ 214 dirs, 5382 files, 3m12s  /John_Flynn/Madagascar/CT/specimen_0042
+```
+
+There's no percentage or bar because the size of the tree isn't known until the
+walk finishes. The readout is suppressed automatically when stderr isn't a
+terminal (piped or redirected output), or explicitly with `--quiet`. Pressing
+Ctrl-C stops the walk and leaves the partial tree in the output file.
 
 #### `globus-find.py`
 
