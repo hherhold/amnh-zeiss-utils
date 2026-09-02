@@ -360,6 +360,89 @@ python restore_segmentation_dimensions.py \
 3. `restore_segmentation_dimensions.py` — pad the biomedisa output back to the original dimensions so it re-loads correctly in Slicer
 
 
+### `fix-voxel-size.py`
+
+Corrects a mis-recorded voxel size across every file of a 3D Slicer scene.
+
+Occasionally a volume is imported with the wrong voxel size, and the error then
+propagates through everything downstream: the source `.nrrd`, every `.seg.nrrd`,
+every exported model, the markups files and the `.mrml` scene all end up describing
+the specimen at the wrong physical scale. Editing the `.nrrd` header by hand fixes
+the volume but leaves the models and markups behind, so the scene no longer lines up.
+
+The script reads the *current* (wrong) voxel size from the scene's source volume,
+computes the scale factor `s = correct voxel size / current voxel size`, and applies a
+uniform scale of `s` about the world origin to every physical (mm) quantity it finds:
+
+| File | What is rescaled |
+| --- | --- |
+| `.nrrd`, `.seg.nrrd` | `space directions`, `space origin`, `spacings`, and the `Reference image geometry` matrix inside `Segmentation_ConversionParameters` |
+| `.ply`, `.stl`, `.obj` | vertex coordinates |
+| `.mrk.json` | control point positions, ROI/plane geometry, object-to-world matrices, measurement values |
+| `*.metrics.json` | values whose key names their unit (`in mm`, `in um`, `mm^3`, ...) |
+| `.mrml` | volume spacing and origin, camera, view, slice and crosshair geometry, markup interaction handles |
+
+Voxel counts, segment extents, direction cosines and surface normals are unaffected by a
+uniform scale and are left untouched. Markup and model *display* sizes (`glyphScale`,
+`textScale` and friends) are also left alone, since they may be relative rather than
+absolute depending on sibling attributes.
+
+**Discovery.** The scene's storage nodes give the volume, segmentation and markups files.
+Exported models usually live outside the Slicer folder, so the script also walks the
+parent of the scene's directory — the specimen folder in the usual layout. Use
+`--scan-root` to point somewhere else, or `--no-scan` to touch only what the scene
+itself references.
+
+```text
+usage: fix-voxel-size.py [-h] --voxel-size VOXEL_SIZE [--units {cm,m,mm,nm,um}]
+                         [--reference-volume REFERENCE_VOLUME]
+                         [--scan-root SCAN_ROOT] [--no-scan] [--apply] [--backup]
+                         scene
+
+positional arguments:
+    scene                 the .mrml scene file
+
+options:
+    -h, --help            show this help message and exit
+    --voxel-size          the correct (isotropic) voxel size
+    --units               units of --voxel-size (default: mm)
+    --reference-volume    volume file holding the wrong voxel size
+                          (default: the scene's source volume)
+    --scan-root           directory tree to search for related files
+                          (default: the parent of the scene's folder)
+    --no-scan             only touch files the scene itself references
+    --apply               write the changes (default is a dry run)
+    --backup              copy each file to <name>.orig before writing
+```
+
+**Example:**
+
+```bash
+# See what would change (this is the default - nothing is written)
+python fix-voxel-size.py "Eira barbara AMNH 32065/Slicer files/Eira barbara.mrml"     --voxel-size 0.05272172
+
+# Do it
+python fix-voxel-size.py "Eira barbara AMNH 32065/Slicer files/Eira barbara.mrml"     --voxel-size 0.05272172 --apply
+```
+
+**Notes on safety and repeat runs**
+
+- Nothing is written without `--apply`; the default is a dry run that prints exactly
+  what would change, file by file.
+- The scale factor always comes from the source volume's header, so once that file is
+  correct a second run computes `s = 1` and does nothing. The source volume is written
+  *last*, which means an interrupted run can simply be re-run.
+- A volume whose spacing does not match the source volume's is reported and skipped
+  rather than silently rescaled.
+- Large files are edited in place: a `.nrrd` header is padded to its original byte
+  length so a multi-gigabyte data block never has to be copied, and mesh vertices are
+  rescaled with a chunked read/modify/write. That means an interrupted write would
+  leave a half-scaled file, so while a file is open a `.fixvoxel-inprogress` marker
+  sits beside it, and the script refuses to touch a file whose marker is still present.
+  `--backup` keeps a `.orig` copy of everything before it is modified, at the cost of
+  needing as much free space again.
+
+
 ### `ge_scan_db.py`
 
 **What it does**
