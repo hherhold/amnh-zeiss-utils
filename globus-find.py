@@ -11,6 +11,9 @@ output file.
 Authentication uses the Globus Native App OAuth flow. On first run you will be
 prompted to visit a URL, log in, and paste back an authorization code. Tokens are
 cached in ~/.globus-tree-tokens.json so subsequent runs don't require re-login.
+Collections that require an additional data-access consent (e.g. Globus Connect
+Server v5 mapped collections) will prompt you to log in again with the extra
+scopes.
 
 By Hollister Herhold, AMNH, 2026.
 Claude Opus 4.8 used for initial authoring.
@@ -53,11 +56,17 @@ def save_tokens(token_response):
         pass
 
 
-def do_login_flow():
-    """Run the Native App OAuth flow and return freshly minted transfer tokens."""
+def do_login_flow(scopes=None):
+    """Run the Native App OAuth flow and return freshly minted transfer tokens.
+
+    `scopes` is a list of requested scopes; it defaults to the full transfer
+    scope. Pass additional (e.g. data-access) scopes when a collection needs
+    consent beyond the base transfer scope."""
+    if scopes is None:
+        scopes = [TransferScopes.all]
+
     auth_client = globus_sdk.NativeAppAuthClient(CLIENT_ID)
-    auth_client.oauth2_start_flow(requested_scopes=TransferScopes.all,
-                                  refresh_tokens=True)
+    auth_client.oauth2_start_flow(requested_scopes=scopes, refresh_tokens=True)
 
     authorize_url = auth_client.oauth2_get_authorize_url()
     print("Please go to this URL and log in:\n")
@@ -92,6 +101,22 @@ def _on_refresh(token_response):
     existing.update(tokens)
     with open(TOKEN_FILE, "w") as f:
         json.dump(existing, f)
+
+
+def consent_required_scopes(tc, collection_id, path):
+    """Probe a directory and return any extra scopes Globus says we must consent
+    to before we can use this collection, or [] if none are needed.
+
+    Globus Connect Server v5 mapped collections require a per-collection
+    data_access consent on top of the base transfer scope. Errors other than
+    "consent required" are ignored here -- they'll surface, if real, during the
+    actual listing."""
+    try:
+        tc.operation_ls(collection_id, path=path)
+    except globus_sdk.TransferAPIError as e:
+        if e.info.consent_required:
+            return list(e.info.consent_required.required_scopes)
+    return []
 
 
 def list_dir(tc, collection_id, path):
@@ -168,6 +193,16 @@ def main():
         parser.error("--max-depth must be 1 or greater")
 
     tc = get_transfer_client()
+
+    # Mapped collections may require an extra data-access consent. Probe the
+    # starting path and, if needed, re-login with the extra scopes before
+    # walking the tree.
+    needed = consent_required_scopes(tc, args.collection_id, args.path)
+    if needed:
+        print("This collection needs additional consent; re-authenticating...",
+              file=sys.stderr)
+        do_login_flow(scopes=[TransferScopes.all] + needed)
+        tc = get_transfer_client()
 
     # Confirm the collection is reachable before we start walking it.
     try:
