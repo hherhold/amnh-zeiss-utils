@@ -12,8 +12,8 @@ the Microscopy and Imaging Facility at AMNH. What this means is:
  - You get the idea
 
 It is assumed that you are familiar with running python scripts from the command line
-and setting up conda environments. A YAML file (`amnh-zeiss-utils.yaml`) is included with
-the required packages. (But see Requirements section, below.)
+and setting up conda environments. If you aren't, [SETUP.md](SETUP.md) walks you
+through it (see Requirements, below).
 
 With that out of the way...
 
@@ -22,7 +22,7 @@ This repo contains tools for:
  - Handling Zeiss txm and txrm files, specifically micro-CT files. These python scripts
 allow extraction of metadata from unreconstructed ('`txrm`') and reconstructed ('`txm`')
 files, as well as converting reconstructed ('`txm`') files to TIFF stacks or NRRD files.
-(You can convert unreconstruced files too, not sure why you'd want to.) There are also
+(You can convert unreconstructed files too, not sure why you'd want to.) There are also
 some utilities for OLE files (the format Zeiss uses for these files.) 
 
  - Walking globus directory trees/collections to find specific file types. This is used
@@ -36,7 +36,28 @@ some utilities for OLE files (the format Zeiss uses for these files.)
 Note that this repo does not rely on any proprietary libraries (such as Zeiss) and is
 standalone (apart from setting up python dependencies in an environment, see below) and
 you can run scripts here on any machine. This means that changes to Zeiss' (or anybody
-else's) proprietary file format may break this code.
+else's) proprietary file formats may break this code.
+
+## Requirements
+
+**New to conda?** See [SETUP.md](SETUP.md) for a step-by-step guide to
+installing Miniconda and setting up an environment (Windows and Mac).
+
+If you already know your way around conda, the short version is:
+
+```bash
+conda create -n amnh-zeiss-utils --override-channels -c conda-forge python=3.12
+conda activate amnh-zeiss-utils
+pip install globus-sdk pyside6 numpy olefile tifffile pynrrd tqdm
+```
+
+That installs everything the scripts in this repo need.
+
+**Note:** This repo also contains an `amnh-zeiss-utils.yaml` environment file
+(with some extras used in development, such as Jupyter notebook support). It is
+currently out of date and may not install cleanly, so use the commands above
+instead. If a script complains about a missing module, `pip install` it into the
+environment and try again.
 
 ## TL;DR - `txrm-monitor.py` at AMNH MIF
 
@@ -673,14 +694,6 @@ instead of 4 s for the 156 MB example). Pass `--no-cache` to disable this.
 python globus-tree.py -c SOURCE_COLLECTION_ID -p /John_Flynn -d 4 -o flynn.txt
 python tree-viewer.py flynn.txt
 ```
-
-## Requirements
-
-This repo contains a `amnh-zeiss-utils.yaml` file for creating an environment
-with the required packages (and some extras that were used in development, such
-as Jupyter notebook support). To be honest, I've had varying success with these
-setups. If this doesn't work, just keep running the scripts, installing what is
-missing as you go.
 
 ## Contact
 
