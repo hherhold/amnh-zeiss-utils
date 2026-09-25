@@ -181,6 +181,14 @@ The examples below use `SOURCE_ID` for the remote collection's UUID and
 `LOCAL_ID` for your Globus Connect Personal collection's UUID. Replace both
 with real UUIDs.
 
+`/John_Flynn` is just an example starting folder on the remote collection. Your
+data is probably somewhere else, so replace it with your own path. Globus paths
+always use forward slashes (`/`), even on Windows, and start from the top of the
+collection. To find the right one, browse to the folder in the File Manager of
+the Globus web app and copy the path from the **Path** box. If you leave out
+`-p`, the scripts start at the top of the collection. On a big collection that
+can take a very long time, so start as far down as you can.
+
 **Put each command on a single line.** The main README breaks long commands
 across lines with `\`, which works on a Mac but not in the Windows prompt.
 
