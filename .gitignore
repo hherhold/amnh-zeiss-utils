@@ -219,3 +219,8 @@ scans.sqlite
 # Config file for Zeiss TXRM monitor. Created by the app on startup and is
 # machine-specific.
 txrm-monitor-config.json
+
+# Recent-run parameters saved by the globus-tree.py / globus-clone.py GUIs.
+# Machine- and user-specific.
+globus-tree-recent.json
+globus-clone-recent.json

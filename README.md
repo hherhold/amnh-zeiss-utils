@@ -524,12 +524,18 @@ metadata files) to a local Globus Connect Personal endpoint.
 flow. On first run you are prompted to visit a URL, log in, and paste back an
 authorization code. Tokens are then cached in `~/.globus-tree-tokens.json` and
 shared by all three tools, so subsequent runs don't require re-login. These
-scripts require the `globus_sdk` package. (`tree-viewer.py` is an offline GUI for
-reading what `globus-tree.py` wrote — it needs neither the SDK nor a login.)
+scripts require the `globus_sdk` package, and `globus-tree.py` and
+`globus-clone.py` also need `PySide6` for their GUIs. (`tree-viewer.py` is an
+offline GUI for reading what `globus-tree.py` wrote — it needs neither the SDK
+nor a login.)
 
 Common options: `-c/--collection-id` selects the source collection, `-p/--path`
 sets the starting path on it, and `-d/--max-depth` limits how deep the recursion
 descends (the starting path is depth 0).
+
+`globus-tree.py` and `globus-clone.py` can also run as a window instead of from
+the command line: add `-gui`. See [GUI mode](#gui-mode--globus-treepy--gui-globus-clonepy--gui)
+below.
 
 #### `globus-tree.py`
 
@@ -538,7 +544,7 @@ writes it to a file.
 
 ```text
 usage: globus-tree.py [-h] -c COLLECTION_ID [-p PATH] -o OUTPUT_FILE
-                      [-d MAX_DEPTH] [-q]
+                      [-d MAX_DEPTH] [-q] [-gui]
 
 options:
     -h, --help            show this help message and exit
@@ -550,6 +556,8 @@ options:
     -d, --max-depth MAX_DEPTH
                           Maximum directory depth to descend (default: unlimited)
     -q, --quiet           Suppress the progress status line
+    -gui, --gui           Open the graphical interface instead (any other options
+                          are ignored; the window has fields for them).
 ```
 
 While it runs, a one-line status readout is rewritten in place on stderr showing
@@ -603,6 +611,7 @@ placed under `--dest-path`, recreating their paths relative to the source
 ```text
 usage: globus-clone.py [-h] -c COLLECTION_ID [-p PATH] -C DEST_COLLECTION_ID
                        -P DEST_PATH [-d MAX_DEPTH] [-i] [-n] [-w] [-l LABEL]
+                       [-gui]
                        pattern
 
 positional arguments:
@@ -627,6 +636,8 @@ options:
                           but don't submit a transfer.
     -w, --wait            Wait for the transfer to finish before exiting.
     -l, --label LABEL     Label for the Globus transfer task (default: globus-clone)
+    -gui, --gui           Open the graphical interface instead (any other arguments
+                          are ignored; the window has fields for them).
 ```
 
 **Example** — clone every `.pca` and `.pcr` metadata file from a remote
@@ -637,6 +648,96 @@ python globus-clone.py "*.pc[a,r]" \
     -c SOURCE_COLLECTION_ID -p /data/scans \
     -C LOCAL_COLLECTION_ID  -P /home/me/pca_test
 ```
+
+#### GUI mode — `globus-tree.py -gui`, `globus-clone.py -gui`
+
+Both scripts open a PySide6 window instead of running from the command line
+when given `-gui`:
+
+```bash
+python globus-tree.py -gui
+python globus-clone.py -gui
+```
+
+Any other options on the command line are ignored. The window has a field for
+each of them:
+
+| Window field | Command-line option |
+| --- | --- |
+| **`globus-tree.py`** | |
+| Collection ID | `-c/--collection-id` |
+| Starting path | `-p/--path` |
+| Output file (with **Browse...**) | `-o/--output-file` |
+| Max depth (*Unlimited* = no limit) | `-d/--max-depth` |
+| **`globus-clone.py`** | |
+| Source: Collection ID | `-c/--collection-id` |
+| Source: Starting path | `-p/--path` |
+| Source: Pattern, **Ignore case** | `pattern`, `-i/--ignore-case` |
+| Source: Max depth (*Unlimited* = no limit) | `-d/--max-depth` |
+| Destination: Collection ID | `-C/--dest-collection-id` |
+| Destination: Path | `-P/--dest-path` |
+| Destination: Transfer label | `-l/--label` |
+| **Dry run** | `-n/--dry-run` |
+| **Monitor the transfer until it finishes** | `-w/--wait` |
+
+`-q/--quiet` has no field: the window always shows its status.
+
+Collection IDs are checked before anything is sent to Globus. They must be
+UUIDs, as copied from the collection's page in the Globus web app.
+
+**Logging in.** When a login is needed, the Globus login page opens in your web
+browser and a dialog asks for the authorization code. The dialog also has
+buttons to reopen the page or copy its link. A second login for a collection's
+extra data-access consent works the same way. The tokens are the same
+`~/.globus-tree-tokens.json` the command-line tools use, so logging in with
+either one covers both.
+
+**Status and log.** While a run is going, the window shows:
+
+- an animated busy bar. It isn't a progress bar, because the size of the tree
+  isn't known until the walk finishes;
+- running counts and the elapsed time;
+- the directory currently being listed or searched.
+
+Below that, a log shows each step, any `could not list` warnings, and the result
+of every run. **Stop** works like Ctrl-C on the command line:
+
+- `globus-tree.py` leaves the partial tree in the output file.
+- `globus-clone.py`, stopped during the search, submits nothing. Stopped while
+  monitoring a transfer, it only stops watching: the transfer carries on at
+  Globus.
+
+A run that fails or is stopped shows its final status in red.
+
+**Recent runs.** The last five sets of parameters are saved next to the script,
+in `globus-tree-recent.json` and `globus-clone-recent.json`. Git ignores both
+files. Pick one from the **Recent runs** list at the top of the window to fill
+the form in again. The most recent set is loaded when the window opens.
+
+- Each line shows when the run was made, the collection's name, the path(s) and
+  pattern, and the depth (plus *ignore case* for the clone window). Hover over a
+  line to see every setting.
+- A run is saved when you start it. Re-running a set that's already in the list
+  doesn't add a second copy: the existing entry moves to the top with the new
+  time. When comparing runs, a trailing `/` on a path doesn't count, so
+  `/John_Flynn` and `/John_Flynn/` are the same run.
+
+**`globus-tree.py` specifics.** If the output file already exists, you're asked
+before it's replaced. (Choosing the file with **Browse...** asks at that point
+instead.)
+
+**`globus-clone.py` specifics.**
+
+- **Dry run** is checked every time the window opens and isn't saved with the
+  recent runs, so a real transfer is always a deliberate choice. The start
+  button reads **Dry run** or **Start transfer** to match. A dry run's
+  `source -> destination` list appears in the log.
+- The destination collection ID may be left empty for a dry run.
+- After a transfer is submitted, the window shows its task ID as a link to the
+  task's page in the Globus web app. With **Monitor the transfer until it
+  finishes** checked, the window checks on the transfer every 15 seconds and
+  shows its status, files transferred and skipped, and bytes copied, until it
+  succeeds or fails.
 
 #### `tree-viewer.py`
 

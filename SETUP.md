@@ -72,7 +72,9 @@ conda activate amnh-zeiss-utils
 ```
 
 The start of the prompt should change from `(base)` to `(amnh-zeiss-utils)`.
-Now install the Globus library, and the two packages the tree viewer GUI needs:
+Now install the Globus library, and the packages the GUIs need (`pyside6` is
+used by `tree-viewer.py` and by the `-gui` windows of `globus-tree.py` and
+`globus-clone.py`):
 
 ```bat
 pip install globus-sdk pyside6 numpy
@@ -150,6 +152,9 @@ Enter the authorization code here:
    click **Allow**.
 3. Globus then shows an **authorization code**. Copy it, go back to the prompt,
    paste it (right-click, or **Ctrl+V**), and press **Enter**.
+
+In the GUI (`-gui`, see below), the login page opens in your browser by
+itself, and a dialog asks you to paste the authorization code.
 
 Your login is saved in `C:\Users\<you>\.globus-tree-tokens.json`, and all
 three scripts share it. You won't be asked again unless you delete that file
@@ -231,6 +236,18 @@ A few notes about the destination:
 - Globus Connect Personal must be **running and not paused**. The destination
   folder must also be one it's allowed to write to: check **Options** →
   **Access** in Globus Connect Personal. By default that's your home folder.
+
+**Prefer a window to typing commands?** `globus-tree.py` and `globus-clone.py`
+both have a GUI:
+
+```bat
+python globus-clone.py -gui
+```
+
+Fill in the fields and click **Start** (or **Dry run**). The window remembers
+your last five sets of settings: pick one from **Recent runs** at the top to
+fill the form in again. In the clone window, **Dry run** is always checked when
+the window opens. Uncheck it when you're ready to copy for real.
 
 The main [README](README.md#globus-utilities--globus-treepy-globus-findpy-globus-clonepy-tree-viewerpy)
 lists every option each script takes. You can also run any script with `-h`.
