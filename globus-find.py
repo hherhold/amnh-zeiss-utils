@@ -24,6 +24,7 @@ import argparse
 import fnmatch
 import json
 import os
+import re
 import sys
 
 import globus_sdk
@@ -153,9 +154,12 @@ def find_matches(tc, collection_id, path, pattern, on_match, counts,
     if dirs is None:
         return
 
-    match = fnmatch.fnmatch if case_insensitive else fnmatch.fnmatchcase
+    # Not fnmatch.fnmatch for -i: it only ignores case on Windows (it goes
+    # through os.path.normcase), so ask the regex engine to do it instead.
+    flags = re.IGNORECASE if case_insensitive else 0
+    match = re.compile(fnmatch.translate(pattern), flags).match
     for name in files:
-        if match(name, pattern):
+        if match(name):
             on_match(join_path(path, name))
             counts["matches"] += 1
 
