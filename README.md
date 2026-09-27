@@ -26,12 +26,24 @@ files, as well as converting reconstructed ('`txm`') files to TIFF stacks or NRR
 some utilities for OLE files (the format Zeiss uses for these files.) 
 
  - Walking globus directory trees/collections to find specific file types. This is used
-   for hunting for (and retrieving) PCA and PCR files.
+   for hunting for (and retrieving) PCA and PCR files. In particular, globus-clone
+   will make a copy of a directory tree of a DTN over globus, copying over only the
+   files you want (for example, .pca and .pcr).
 
  - Scanning PCA and PCR files (from a GE scanner) for metadata and putting it in a small
-   local database for report generation, etc.
+   local database for report generation, etc. This is **very** much in early stages; the
+   db created here is only marginally better than a giant CSV file. I am **not** a
+   database person, nor do I want to be, so don't spam me with "are these tables 
+   normalized" or "you could have used postgres" or "Excel will do that", or whatever.
 
- - Tools for handling Slicer files, and translating file formats for Slicer. 
+ - Tools for handling Slicer files, and translating file formats for Slicer. There are
+   a few utilities that subsample slices of a segmentation in different axes for use
+   as preprocessors for Biomedisa. These are all **very** experimental and probably
+   not useful to anybody but me.
+
+There are also a couple of markdown files with requirements for some of the tools.
+These were fed to Claude Sonnet and/or Claude Opus (various versions of both) for
+development.
 
 Note that this repo does not rely on any proprietary libraries (such as Zeiss) and is
 standalone (apart from setting up python dependencies in an environment, see below) and
@@ -51,7 +63,10 @@ conda activate amnh-zeiss-utils
 pip install globus-sdk pyside6 numpy olefile tifffile pynrrd tqdm
 ```
 
-That installs everything the scripts in this repo need.
+That installs (almost) everything the scripts in this repo need. There may be
+a handful of packages for the database stuff; it's not documented thoroughly
+yet because I'm not sure what I'm going to do with it, or if it will be used
+at all in its current form.
 
 **Note:** This repo also contains an `amnh-zeiss-utils.yaml` environment file
 (with some extras used in development, such as Jupyter notebook support). It is
@@ -149,20 +164,20 @@ background. Closing the window exits the application.
 ### `get-metadata-from-txrm.py`
 
 ```text
-usage: get-metadata-from-txrm.py [-h] -i INPUT_TXRM_FILE [-o OUTPUT_FILE] [-v] [-f FIELDS]
+usage: get-metadata-from-txrm.py [-h] -i INPUT_TXRM_FILE [-v] [-f FIELDS] [-a]
 
 Extract metadata from a Zeiss txrm file.
 
 options:
     -h, --help            show this help message and exit
-    -i INPUT_TXRM_FILE, --input-txrm-file INPUT_TXRM_FILE
-                            Input Zeiss txrm file
-    -o OUTPUT_FILE, --output-file OUTPUT_FILE
-                            Output file to save metadata
+    -i, --input-txrm-file INPUT_TXRM_FILE
+                          Input Zeiss txrm file
     -v, --verbose         Enable verbose output
-    -f FIELDS, --fields FIELDS
-                            Comma-separated list of fields to extract
+    -f, --fields FIELDS   Comma-separated list of fields to extract
+    -a, --all             Extract all available metadata fields
 ```
+
+Metadata is printed to stdout; redirect it (`> file.txt`) to save it.
 
 
 ### `dump-ole-directory.py`

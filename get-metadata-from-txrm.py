@@ -23,8 +23,6 @@ parser = argparse.ArgumentParser(description="Extract metadata from a Zeiss txrm
 
 parser.add_argument("-i", "--input-txrm-file", help="Input Zeiss txrm file", 
                     required=True)
-parser.add_argument("-o", "--output-file", help="Output file to save metadata", 
-                    required=False, default=None)
 parser.add_argument("-v", "--verbose", help="Enable verbose output",
                     action="store_true", default=False)
 parser.add_argument("-f", "--fields", help="Comma-separated list of fields to extract",
@@ -252,8 +250,6 @@ def main():
     if args.verbose:
         print("Verbose mode enabled.")
         print("Input file:", args.input_txrm_file)
-        if args.output_file:
-            print("Output file:", args.output_file)
 
     metadata = read_metadata(args.input_txrm_file)
 
