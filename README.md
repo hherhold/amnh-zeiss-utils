@@ -337,6 +337,79 @@ options:
 python tiff-to-nrrd.py -i recon_tiffs -o specimen.nrrd -s 0.0125 -c 0
 ```
 
+### `crop-nrrd.py`
+
+Crops a 3D NRRD volume to a Slicer ROI and writes the result to a new NRRD,
+optionally resampling it. The ROI is the `.mrk.json` file you get by saving
+the Crop Volume module's ROI (e.g. `Crop Volume ROI.mrk.json`). Slicer's Crop
+Volume module holds the whole input volume and the whole output in memory at
+once. This tool reads only the part of the input inside the ROI and writes
+the output slice by slice, so memory stays at a few hundred MB whatever the
+volume size.
+
+```text
+usage: crop-nrrd.py [-h] -r ROI -i INPUT_NRRD_FILE -o OUTPUT_NRRD_FILE
+                    [-s SPACING_SCALE] [-n] [-c {0-9}] [-v]
+
+options:
+    -h, --help            show this help message and exit
+    -r, --roi ROI         Slicer ROI markup file (.mrk.json), e.g. 'Crop Volume
+                          ROI.mrk.json'
+    -i, --input-nrrd-file INPUT_NRRD_FILE
+                          Input NRRD volume (.nrrd or .nhdr)
+    -o, --output-nrrd-file OUTPUT_NRRD_FILE
+                          Output NRRD file
+    -s, --spacing-scale SPACING_SCALE
+                          Output voxel size as a multiple of the input's, as in
+                          Slicer's Crop Volume module: 1.0 (the default) crops
+                          without resampling; 0.5 halves the voxel size (twice as
+                          many voxels along each axis); 2.0 doubles it.
+    -n, --nearest         Resample with nearest-neighbor instead of linear
+                          interpolation (use this for label maps /
+                          segmentations). Only matters when the spacing scale
+                          isn't 1.0.
+    -c, --compression-level {0-9}
+                          gzip compression level for the output; 0 writes
+                          uncompressed (raw) data. Default: match the input (raw
+                          stays raw, compressed becomes gzip level 1).
+    -v, --verbose         Enable verbose output
+```
+
+- **Spacing scale 1.0** (the default) copies the input voxels whose centers
+  fall inside the ROI, unchanged, like Slicer's voxel-based cropping. The
+  output keeps the input's voxel size and axis directions.
+- **Any other spacing scale** resamples the ROI with linear interpolation, the
+  default in Slicer's interpolated cropping. The output voxel size is the
+  input's times the scale, and the output grid is centered in the ROI. Use
+  `-n` for segmentations and label maps, so voxel values aren't blended. Parts
+  of the ROI outside the volume are filled with 0. Halving the voxel size
+  (`-s 0.5`) gives 8 times as many voxels, so check the output size the tool
+  prints before it starts writing.
+- **Supported ROIs:** the ROI's axes must be parallel to the volume's, which
+  is the case unless you've rotated it in Slicer. Rotated ROIs are refused
+  with a message; crop those in Slicer. A transform applied to the ROI in the
+  Slicer scene isn't saved in its `.mrk.json`, so it isn't applied here.
+- **Unlike Slicer, the output keeps the input's axis directions.** Slicer's
+  interpolated cropping aligns the output to the ROI's axes, which usually
+  flips its X and Y relative to the input. The physical geometry is the same
+  either way, so it looks identical in Slicer, but here the voxels stay laid
+  out like the input's.
+- **Inputs:** the input can be raw, gzip or bzip2 encoded, with an attached or
+  detached (`.nhdr`) header, and the ROI can be in LPS or RAS coordinates.
+- **Speed:** uncompressed input is fastest. The tool seeks straight to the
+  slices and rows it needs. Compressed input has to be decompressed from the
+  start up to the end of the ROI. Cropping a raw 89 GB volume at scale 4 took
+  8 seconds.
+- **Failures and Ctrl-C:** the incomplete output file is deleted.
+
+**Example** — crop to a saved ROI without resampling, then a half-resolution
+version:
+
+```bash
+python crop-nrrd.py -r "Crop Volume ROI.mrk.json" -i specimen.nrrd -o specimen_crop.nrrd
+python crop-nrrd.py -r "Crop Volume ROI.mrk.json" -i specimen.nrrd -o specimen_crop_x2.nrrd -s 2.0
+```
+
 ### `extract-pca-data.py`
 
 Recursively searches a directory for Zeiss `.pca` files (INI-format scan parameter files) and
