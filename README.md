@@ -281,6 +281,62 @@ options:
     -v, --verbose         Enable verbose output
 ```
 
+### `tiff-to-nrrd.py`
+
+Converts a directory of 2D TIFF slices (one slice per file) into a single NRRD
+volume, for loading into 3D Slicer. It streams the slices into the output file
+one at a time, so memory use stays at a few hundred MB however large the stack
+is. An 80 GB volume never has to fit in memory.
+
+```text
+usage: tiff-to-nrrd.py [-h] -i INPUT_DIR -o OUTPUT_NRRD_FILE [-s MM [MM ...]]
+                       [-g GLOB] [-c {0-9}] [-v]
+
+options:
+    -h, --help            show this help message and exit
+    -i, --input-dir INPUT_DIR
+                          Directory holding the TIFF slices, one slice per file.
+                          Files are taken in natural name order (slice_2 before
+                          slice_10).
+    -o, --output-nrrd-file OUTPUT_NRRD_FILE
+                          Output NRRD file
+    -s, --voxel-size MM [MM ...]
+                          Voxel size in mm: one value for isotropic voxels, or
+                          three for X Y Z. If omitted, the NRRD has no physical
+                          size (Slicer will assume 1 mm).
+    -g, --glob GLOB       Which files in the directory are slices, as a case-
+                          insensitive shell-style pattern (default: *.tif*, i.e.
+                          .tif and .tiff). Hidden files are always skipped.
+    -c, --compression-level {0-9}
+                          gzip compression level; 0 writes uncompressed (raw)
+                          data, which is fastest to write and to load (default: 1)
+    -v, --verbose         Enable verbose output
+```
+
+- **Slice order:** the first file in natural name order becomes slice 0.
+  Numbers in file names sort numerically, so unpadded names like `slice_2` and
+  `slice_10` come out in the right order.
+- **Checks before writing:** every file must be a single grayscale 2D image,
+  with the same size and data type as the others. The tool checks every file's
+  header before writing anything, so a bad file is caught at the start rather
+  than partway through a long conversion. The data type is kept (8-bit, 16-bit,
+  float, ...).
+- **Hidden files are skipped,** including the `._` files macOS leaves next to
+  every file on external drives formatted as exFAT or FAT.
+- **Failures and Ctrl-C:** if the conversion fails or is stopped, the
+  incomplete output file is deleted.
+- **Compression and speed:** gzip compression runs on a single core, at about
+  75 MB/s at the default level 1 (roughly 20 minutes for an 80 GB stack). For
+  very large volumes, `-c 0` writes uncompressed data as fast as the disk
+  allows, and Slicer loads it faster too, at the cost of a larger file. CT data
+  typically compresses only modestly.
+
+**Example** — a stack with 12.5 µm isotropic voxels, written uncompressed:
+
+```bash
+python tiff-to-nrrd.py -i recon_tiffs -o specimen.nrrd -s 0.0125 -c 0
+```
+
 ### `extract-pca-data.py`
 
 Recursively searches a directory for Zeiss `.pca` files (INI-format scan parameter files) and
