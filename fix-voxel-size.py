@@ -50,6 +50,11 @@ Safety
 Usage
     python fix-voxel-size.py SCENE.mrml --voxel-size 0.05272172
     python fix-voxel-size.py SCENE.mrml --voxel-size 52.72172 --units um --apply
+    python fix-voxel-size.py SEGMENTATION.seg.nrrd --voxel-size 2.72 --units um
+
+    Given a single file instead of a .mrml scene, only that file is fixed
+    (plus anything found under --scan-root, if given).  A lone volume or
+    segmentation is its own reference volume.
 
 Dependencies: numpy (only for binary mesh files).
 """
@@ -859,8 +864,9 @@ def discover(scene, scan_root):
             files.append(os.path.abspath(path))
 
     add(scene)
-    for path in mrml_referenced_files(scene):
-        add(path)
+    if classify(scene) == "mrml":
+        for path in mrml_referenced_files(scene):
+            add(path)
     if scan_root:
         for dirpath, dirnames, filenames in os.walk(scan_root):
             dirnames.sort()
@@ -978,7 +984,9 @@ def main():
                     "and all of its volume, segmentation, model and markups "
                     "files.",
         epilog="By default nothing is written; pass --apply to make changes.")
-    parser.add_argument("scene", help="the .mrml scene file")
+    parser.add_argument("scene",
+                        help="the .mrml scene file, or a single volume, "
+                             "segmentation, model or markups file")
     parser.add_argument("--voxel-size", type=float, required=True,
                         help="the correct (isotropic) voxel size")
     parser.add_argument("--units", default="mm",
@@ -989,7 +997,8 @@ def main():
                              "(default: the scene's source volume)")
     parser.add_argument("--scan-root",
                         help="directory tree to search for related files "
-                             "(default: the parent of the scene's folder)")
+                             "(default: the parent of the scene's folder; "
+                             "no search when given a single file)")
     parser.add_argument("--no-scan", action="store_true",
                         help="only touch files the scene itself references")
     parser.add_argument("--apply", action="store_true",
@@ -1001,6 +1010,13 @@ def main():
     scene = os.path.abspath(args.scene)
     if not os.path.isfile(scene):
         sys.exit(f"scene not found: {scene}")
+    # Anything other than a .mrml is a single data file to fix on its own.
+    kind = classify(scene)
+    if kind is None:
+        sys.exit(f"don't know how to rescale {os.path.basename(scene)}; "
+                 "expected a .mrml scene or a .nrrd, .seg.nrrd, .ply, .stl, "
+                 ".obj, .mrk.json or .metrics.json file")
+    is_scene = kind == "mrml"
 
     target_mm = args.voxel_size * UNIT_SCALE_TO_MM[args.units]
     if target_mm <= 0:
@@ -1008,10 +1024,16 @@ def main():
 
     # The wrong spacing comes from the volume the scene is built on, so a
     # second run over already-corrected data computes a scale factor of 1.
-    reference = args.reference_volume or mrml_reference_volume(scene)
+    # A lone volume or segmentation is its own reference.
+    reference = args.reference_volume
     if not reference:
-        sys.exit("could not identify the scene's source volume; "
-                 "pass --reference-volume")
+        if is_scene:
+            reference = mrml_reference_volume(scene)
+        elif kind == "nrrd":
+            reference = scene
+    if not reference:
+        sys.exit("could not identify the source volume holding the wrong "
+                 "voxel size; pass --reference-volume")
     reference = os.path.abspath(reference)
     if not os.path.isfile(reference):
         sys.exit(f"source volume not found: {reference}")
@@ -1039,8 +1061,11 @@ def main():
               "nothing to do.")
         return 0
 
+    # A single file has no scene folder layout to go by, and walking the
+    # parent of e.g. ~/Downloads would sweep up unrelated meshes, so only
+    # search when asked to.
     scan_root = None
-    if not args.no_scan:
+    if not args.no_scan and (is_scene or args.scan_root):
         scan_root = os.path.abspath(
             args.scan_root or os.path.dirname(os.path.dirname(scene)))
         print(f"Scanning      : {scan_root}")

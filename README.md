@@ -558,6 +558,11 @@ parent of the scene's directory — the specimen folder in the usual layout. Use
 `--scan-root` to point somewhere else, or `--no-scan` to touch only what the scene
 itself references.
 
+**Single files.** In place of a `.mrml` scene you can pass one `.nrrd`, `.seg.nrrd`,
+model or markups file, e.g. a segmentation saved with the wrong voxel size on its own.
+Only that file is fixed (no folder search unless you give `--scan-root`), and a lone
+volume or segmentation is its own reference volume.
+
 ```text
 usage: fix-voxel-size.py [-h] --voxel-size VOXEL_SIZE [--units {cm,m,mm,nm,um}]
                          [--reference-volume REFERENCE_VOLUME]
@@ -565,7 +570,8 @@ usage: fix-voxel-size.py [-h] --voxel-size VOXEL_SIZE [--units {cm,m,mm,nm,um}]
                          scene
 
 positional arguments:
-    scene                 the .mrml scene file
+    scene                 the .mrml scene file, or a single volume,
+                          segmentation, model or markups file
 
 options:
     -h, --help            show this help message and exit
@@ -574,7 +580,8 @@ options:
     --reference-volume    volume file holding the wrong voxel size
                           (default: the scene's source volume)
     --scan-root           directory tree to search for related files
-                          (default: the parent of the scene's folder)
+                          (default: the parent of the scene's folder;
+                          no search when given a single file)
     --no-scan             only touch files the scene itself references
     --apply               write the changes (default is a dry run)
     --backup              copy each file to <name>.orig before writing
@@ -588,6 +595,9 @@ python fix-voxel-size.py "Eira barbara AMNH 32065/Slicer files/Eira barbara.mrml
 
 # Do it
 python fix-voxel-size.py "Eira barbara AMNH 32065/Slicer files/Eira barbara.mrml"     --voxel-size 0.05272172 --apply
+
+# Fix one segmentation that was saved at 1000x scale (2.72 mm instead of 2.72 um)
+python fix-voxel-size.py "Abronica_reproductive.seg.nrrd" --voxel-size 2.72 --units um --apply --backup
 ```
 
 **Notes on safety and repeat runs**
