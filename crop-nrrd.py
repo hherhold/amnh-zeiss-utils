@@ -5,7 +5,8 @@ crop-nrrd.py
 
 Crop a 3D NRRD volume to a Slicer ROI (a "Crop Volume ROI.mrk.json" saved from
 the Crop Volume module or the Markups module), optionally resampling it, and
-write the result to a new NRRD file.
+write the result to a new NRRD file. Without a ROI the whole volume is used,
+which with a spacing scale other than 1.0 just resamples it.
 
 Slicer's Crop Volume module holds the whole input volume and the whole output
 volume in memory at once, which is a problem for very large scans. This tool
@@ -330,6 +331,13 @@ class SliceReader:
 # Working out the crop
 # ---------------------------------------------------------------------------
 
+def whole_volume_bounds(volume):
+    """The whole volume's extent, as roi_index_bounds() gives a ROI's: from
+    the outer edge of the first voxel to the outer edge of the last."""
+    sizes = np.array(volume.sizes, dtype=float)
+    return np.full(3, -0.5), sizes - 0.5
+
+
 def roi_index_bounds(volume, roi):
     """Return the ROI's extent along each volume axis, in continuous voxel
     index coordinates, as (low, high) arrays (x, y, z)."""
@@ -505,9 +513,11 @@ def main():
         description="Crop a 3D NRRD volume to a Slicer ROI (.mrk.json), "
                     "optionally resampling it, without loading the whole "
                     "volume into memory.")
-    parser.add_argument("-r", "--roi", required=True,
+    parser.add_argument("-r", "--roi",
                         help="Slicer ROI markup file (.mrk.json), e.g. "
-                             "'Crop Volume ROI.mrk.json'")
+                             "'Crop Volume ROI.mrk.json'. Optional: without "
+                             "it the whole volume is used (resampled if the "
+                             "spacing scale isn't 1.0).")
     parser.add_argument("-i", "--input-nrrd-file", required=True,
                         help="Input NRRD volume (.nrrd or .nhdr)")
     parser.add_argument("-o", "--output-nrrd-file", required=True,
@@ -540,9 +550,11 @@ def main():
         parser.error("the output file can't be the input file")
 
     try:
-        roi = read_roi(args.roi)
         volume = Volume(args.input_nrrd_file)
-        low, high = roi_index_bounds(volume, roi)
+        if args.roi:
+            low, high = roi_index_bounds(volume, read_roi(args.roi))
+        else:
+            low, high = whole_volume_bounds(volume)
     except CropError as e:
         sys.exit(f"Error: {e}")
 

@@ -345,16 +345,18 @@ the Crop Volume module's ROI (e.g. `Crop Volume ROI.mrk.json`). Slicer's Crop
 Volume module holds the whole input volume and the whole output in memory at
 once. This tool reads only the part of the input inside the ROI and writes
 the output slice by slice, so memory stays at a few hundred MB whatever the
-volume size.
+volume size. The ROI is optional: without `-r` the whole volume is used, so
+`-s` alone resamples the entire volume.
 
 ```text
-usage: crop-nrrd.py [-h] -r ROI -i INPUT_NRRD_FILE -o OUTPUT_NRRD_FILE
+usage: crop-nrrd.py [-h] [-r ROI] -i INPUT_NRRD_FILE -o OUTPUT_NRRD_FILE
                     [-s SPACING_SCALE] [-n] [-c {0-9}] [-v]
 
 options:
     -h, --help            show this help message and exit
     -r, --roi ROI         Slicer ROI markup file (.mrk.json), e.g. 'Crop Volume
-                          ROI.mrk.json'
+                          ROI.mrk.json'. Optional: without it the whole volume
+                          is used (resampled if the spacing scale isn't 1.0).
     -i, --input-nrrd-file INPUT_NRRD_FILE
                           Input NRRD volume (.nrrd or .nhdr)
     -o, --output-nrrd-file OUTPUT_NRRD_FILE
@@ -408,6 +410,7 @@ version:
 ```bash
 python crop-nrrd.py -r "Crop Volume ROI.mrk.json" -i specimen.nrrd -o specimen_crop.nrrd
 python crop-nrrd.py -r "Crop Volume ROI.mrk.json" -i specimen.nrrd -o specimen_crop_x2.nrrd -s 2.0
+python crop-nrrd.py -i specimen.nrrd -o specimen_x2.nrrd -s 2.0    # whole volume, downsampled
 ```
 
 ### `extract-pca-data.py`
