@@ -349,8 +349,8 @@ volume size. The ROI is optional: without `-r` the whole volume is used, so
 `-s` alone resamples the entire volume.
 
 ```text
-usage: crop-nrrd.py [-h] [-r ROI] -i INPUT_NRRD_FILE -o OUTPUT_NRRD_FILE
-                    [-s SPACING_SCALE] [-n] [-c {0-9}] [-v]
+usage: crop-nrrd.py [-h] [-r ROI] -i INPUT_NRRD_FILE [-o OUTPUT_NRRD_FILE]
+                    [-s SPACING_SCALE | -m [N]] [-n] [-c {0-9}] [-v]
 
 options:
     -h, --help            show this help message and exit
@@ -360,12 +360,23 @@ options:
     -i, --input-nrrd-file INPUT_NRRD_FILE
                           Input NRRD volume (.nrrd or .nhdr)
     -o, --output-nrrd-file OUTPUT_NRRD_FILE
-                          Output NRRD file
+                          Output NRRD file. Required unless -m is given; with -m
+                          the default is the input's name with
+                          '-rescaled-<scale>x' inserted (e.g.
+                          '-rescaled-1.25x'), or '-cropped' if only a ROI crop
+                          was needed.
     -s, --spacing-scale SPACING_SCALE
                           Output voxel size as a multiple of the input's, as in
                           Slicer's Crop Volume module: 1.0 (the default) crops
                           without resampling; 0.5 halves the voxel size (twice as
                           many voxels along each axis); 2.0 doubles it.
+    -m, --max-dimension [N]
+                          Downsample just enough that no output axis has more
+                          than N voxels (N defaults to 2048, the largest 3D
+                          texture Slicer's volume rendering gets on Apple
+                          Silicon). The spacing scale is computed from the volume
+                          (or ROI): the smallest one, in hundredths, that fits. A
+                          volume that already fits isn't resampled.
     -n, --nearest         Resample with nearest-neighbor instead of linear
                           interpolation (use this for label maps /
                           segmentations). Only matters when the spacing scale
@@ -387,6 +398,18 @@ options:
   of the ROI outside the volume are filled with 0. Halving the voxel size
   (`-s 0.5`) gives 8 times as many voxels, so check the output size the tool
   prints before it starts writing.
+- **Fitting a volume for volume rendering (`-m`):** on Apple Silicon, Slicer's
+  GPU volume rendering can't use a 3D texture larger than 2048 voxels along
+  any axis. `-m` works out the spacing scale for you: the smallest one, in
+  hundredths, that brings every axis of the output (the whole volume, or the
+  ROI with `-r`) to 2048 or fewer voxels, or to `N` with `-m N`. The scale
+  isn't just the longest axis divided by the limit, rounded to the nearest
+  hundredth, because rounding down can overshoot: a 2570-voxel axis gives
+  2570/2048 = 1.2549, but 1.25 would give 2056 voxels, so `-m` picks 1.26
+  (2040). Without `-o` the output goes next to the input, named e.g.
+  `specimen-rescaled-1.26x.nrrd`. A volume that already fits isn't touched;
+  a ROI that already fits is cropped without resampling, to
+  `specimen-cropped.nrrd`. `-m` and `-s` can't be used together.
 - **Supported ROIs:** the ROI's axes must be parallel to the volume's, which
   is the case unless you've rotated it in Slicer. Rotated ROIs are refused
   with a message; crop those in Slicer. A transform applied to the ROI in the
@@ -411,6 +434,7 @@ version:
 python crop-nrrd.py -r "Crop Volume ROI.mrk.json" -i specimen.nrrd -o specimen_crop.nrrd
 python crop-nrrd.py -r "Crop Volume ROI.mrk.json" -i specimen.nrrd -o specimen_crop_x2.nrrd -s 2.0
 python crop-nrrd.py -i specimen.nrrd -o specimen_x2.nrrd -s 2.0    # whole volume, downsampled
+python crop-nrrd.py -i specimen.nrrd -m    # fit in 2048^3 -> specimen-rescaled-<scale>x.nrrd
 ```
 
 ### `extract-pca-data.py`

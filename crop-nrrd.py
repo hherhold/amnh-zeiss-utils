@@ -24,6 +24,12 @@ Like Slicer's Crop Volume module:
     times the scale: 0.5 halves the voxel size (twice as many voxels along each
     axis), 2.0 doubles it. Samples outside the input are 0.
 
+With --max-dimension N (N = 2048 if not given) the spacing scale is
+computed instead: the smallest scale, in hundredths, at which no output
+axis exceeds N voxels. That's the largest 3D texture Slicer's volume
+rendering can use on Apple Silicon. The output name then defaults to the
+input's with '-rescaled-<scale>x' inserted, e.g. 'scan-rescaled-1.25x.nrrd'.
+
 The ROI's axes must be parallel to the volume's axes (a ROI rotated relative
 to the volume isn't supported; use Slicer for those). The output keeps the
 input volume's axis directions, so its voxels are laid out the same way as the
@@ -373,13 +379,47 @@ def voxel_crop(volume, low, high):
     return ranges
 
 
+def sample_count(extent, scale):
+    """How many output samples an axis `extent` input voxels long gets at a
+    spacing scale of `scale`."""
+    return max(1, round(extent / scale))
+
+
+def fit_scale(low, high, max_dimension):
+    """The smallest spacing scale, in hundredths and at least 1.0, at which
+    no output axis has more than `max_dimension` samples.
+
+    Not simply the nearest hundredth to extent / max_dimension: rounding
+    down can leave an axis over the limit (2570 voxels at 2570/2048 =
+    1.2549 -> 1.25 gives 2056)."""
+    extents = high - low
+    # Below this the longest axis rounds to more than max_dimension samples,
+    # so the search can start here.
+    hundredths = max(100, math.floor(extents.max() / (max_dimension + 0.5)
+                                     * 100))
+    while any(sample_count(e, hundredths / 100) > max_dimension
+              for e in extents):
+        hundredths += 1
+    return hundredths / 100
+
+
+def default_output_name(input_file, scale):
+    """The input's name with '-rescaled-<scale>x' (or '-cropped' when there's
+    no rescaling) inserted before the extension, in the input's directory."""
+    stem, ext = os.path.splitext(input_file)
+    if ext.lower() not in ('.nrrd', '.nhdr'):
+        stem = input_file
+    tag = '-cropped' if scale == 1.0 else f'-rescaled-{scale:g}x'
+    return f'{stem}{tag}.nrrd'
+
+
 def resample_positions(low, high, scale):
     """The output sample positions along each axis, in input index
     coordinates: spaced `scale` input voxels apart and centered in the ROI."""
     positions = []
     for lo, hi in zip(low, high):
         extent = hi - lo
-        n = max(1, round(extent / scale))
+        n = sample_count(extent, scale)
         start = lo + (extent - n * scale) / 2 + scale / 2
         positions.append(start + scale * np.arange(n))
     return positions
@@ -520,14 +560,28 @@ def main():
                              "spacing scale isn't 1.0).")
     parser.add_argument("-i", "--input-nrrd-file", required=True,
                         help="Input NRRD volume (.nrrd or .nhdr)")
-    parser.add_argument("-o", "--output-nrrd-file", required=True,
-                        help="Output NRRD file")
-    parser.add_argument("-s", "--spacing-scale", type=float, default=1.0,
-                        help="Output voxel size as a multiple of the input's, "
-                             "as in Slicer's Crop Volume module: 1.0 (the "
-                             "default) crops without resampling; 0.5 halves "
-                             "the voxel size (twice as many voxels along each "
-                             "axis); 2.0 doubles it.")
+    parser.add_argument("-o", "--output-nrrd-file",
+                        help="Output NRRD file. Required unless -m is given; "
+                             "with -m the default is the input's name with "
+                             "'-rescaled-<scale>x' inserted (e.g. "
+                             "'-rescaled-1.25x'), or '-cropped' if only a ROI "
+                             "crop was needed.")
+    scaling = parser.add_mutually_exclusive_group()
+    scaling.add_argument("-s", "--spacing-scale", type=float, default=1.0,
+                         help="Output voxel size as a multiple of the input's, "
+                              "as in Slicer's Crop Volume module: 1.0 (the "
+                              "default) crops without resampling; 0.5 halves "
+                              "the voxel size (twice as many voxels along each "
+                              "axis); 2.0 doubles it.")
+    scaling.add_argument("-m", "--max-dimension", type=int, nargs="?",
+                         const=2048, metavar="N",
+                         help="Downsample just enough that no output axis has "
+                              "more than N voxels (N defaults to 2048, the "
+                              "largest 3D texture Slicer's volume rendering "
+                              "gets on Apple Silicon). The spacing scale is "
+                              "computed from the volume (or ROI): the "
+                              "smallest one, in hundredths, that fits. A "
+                              "volume that already fits isn't resampled.")
     parser.add_argument("-n", "--nearest", action="store_true",
                         help="Resample with nearest-neighbor instead of "
                              "linear interpolation (use this for label maps / "
@@ -545,9 +599,10 @@ def main():
 
     if not args.spacing_scale > 0:
         parser.error("--spacing-scale must be greater than 0")
-    if (os.path.exists(args.output_nrrd_file)
-            and os.path.samefile(args.output_nrrd_file, args.input_nrrd_file)):
-        parser.error("the output file can't be the input file")
+    if args.max_dimension is not None and args.max_dimension < 1:
+        parser.error("--max-dimension must be at least 1")
+    if args.output_nrrd_file is None and args.max_dimension is None:
+        parser.error("-o/--output-nrrd-file is required unless -m is given")
 
     try:
         volume = Volume(args.input_nrrd_file)
@@ -558,13 +613,33 @@ def main():
     except CropError as e:
         sys.exit(f"Error: {e}")
 
-    compression = args.compression_level
-    if compression is None:
-        compression = 0 if volume.encoding == 'raw' else 1
-    scale = args.spacing_scale
     nx, ny, nz = volume.sizes
     print(f"Input:  {nx} x {ny} x {nz} {volume.dtype.name}, "
           f"{volume.encoding}")
+
+    scale = args.spacing_scale
+    if args.max_dimension is not None:
+        scale = fit_scale(low, high, args.max_dimension)
+        if scale == 1.0 and not args.roi:
+            print(f"Every axis is already at most {args.max_dimension} "
+                  f"voxels; nothing to do.")
+            return
+        if scale == 1.0:
+            print(f"The ROI is already at most {args.max_dimension} voxels "
+                  f"along every axis; cropping without rescaling.")
+        else:
+            print(f"Spacing scale {scale:g} keeps every axis at most "
+                  f"{args.max_dimension} voxels.")
+    if args.output_nrrd_file is None:
+        args.output_nrrd_file = default_output_name(args.input_nrrd_file,
+                                                    scale)
+    if (os.path.exists(args.output_nrrd_file)
+            and os.path.samefile(args.output_nrrd_file, args.input_nrrd_file)):
+        sys.exit("Error: the output file can't be the input file")
+
+    compression = args.compression_level
+    if compression is None:
+        compression = 0 if volume.encoding == 'raw' else 1
 
     try:
         if scale == 1.0:
